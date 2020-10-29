@@ -1,0 +1,1 @@
+There is a corresponding receiver for each sender. The devices are randomly placed in a euclidean plane. For each receiver, the corresponding sender is located [....]
