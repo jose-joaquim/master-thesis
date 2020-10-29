@@ -25,6 +25,18 @@ def distance(a, b, c, d):
     return math.hypot((a - c), (b - d))
 
 
+def gammaToBeta(gamma, dataRates, SINR, bandwidth):
+    m = 8 if bandwidth == 20 else 9
+    last = 0
+    for i in range(-1, m, -1):
+        if dataRates[i][bandwidth] >= gamma:
+            last = i
+        else:
+            break
+
+    return SINR[last][bandwidth]
+
+
 def defineVariables(model, nConnections, nTimeSlots, x_var, t_var, I_var):
     global nChannels
     for i in range(nTimeSlots):
@@ -75,7 +87,7 @@ def defineConstraints(
             expr = gp.LinExpr()
             for c in range(nChannels):
                 expr += x_var[i, c, t]
-    
+
             model.addConstr(expr <= t_var[t])
 
     # Constraint four
