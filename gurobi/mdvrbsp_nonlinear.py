@@ -57,22 +57,8 @@ def defineConstraints(
     global nChannels
 
     # Constraint one
-    for t in range(nTimeSlots):
-        model.addConstr(
-            t_var[t] == gp.max_(
-                x_var[i, c, t]
-                for i in range(nConnections)
-                for c in range(nChannels)
-            )
-        )
-
-        # USING BIG-M (equal as nConnections)
-        # expr = gp.LinExpr()
-        # for i in range(nConnections):
-        #     for c in range(nChannels):
-        #         expr += x_var[i, c, t]
-        #
-        # model.addConstr(expr <= t_var[t] * nConnections)
+    for i in range(nTimeSlots - 1):
+        model.addConstr(t_var[i + 1] <= t_var[i])
 
     # Constraint two
     for i in range(nConnections):
@@ -84,6 +70,15 @@ def defineConstraints(
         model.addConstr(expr == 1.0)
 
     # Constraint three
+    for i in range(nConnections):
+        for t in range(nTimeSlots):
+            expr = gp.LinExpr()
+            for c in range(nChannels):
+                expr += x_var[i, c, t]
+    
+            model.addConstr(expr <= t_var[t])
+
+    # Constraint four
     for i in range(nConnections):
         expr = gp.LinExpr()
         for j in range(nConnections):
