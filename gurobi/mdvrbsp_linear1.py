@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# With Big-M
 
 import gurobipy as gp
 import math
@@ -202,23 +203,134 @@ def read_instance(
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
 
-def defineVariables(model, nConnections, time_slots, x_var, z_var, I_var):
-    print("a")
+def defineVariables(
+    model, nConnections, nTimeSlots, x_var, z_var, I_var, Iij_var, t_var
+):
+    global nChannels
+    for i in range(nTimeSlots):
+        name = "t[" + str(i) + "]"
+        t_var[i] = model.addVar(0.0, 1.0, 1.0, GRB.BINARY, name)
+
+    for i in range(nConnections):
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                name = "x[" + str(i) + "][" + str(c) + "][" + str(t) + "]"
+                x_var[i, c, t] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, name)
+
+    for i in range(nConnections):
+        name = "I[" + str(i) + "]"
+        I_var[i] = model.addVar(0.0, GRB.INFINITY, 0.0, GRB.CONTINUOUS, name)
+
+    for i in range(nConnections):
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                name = "Iij[" + str(i) + "][" + str(c) + "][" + str(t) + "]"
+                Iij_var[i, c, t] = model.addVar(
+                    0.0, GRB.INFINITY, 0.0, GRB.CONTINUOUS, name
+                )
+
+    for i in range(nConnections):
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                name = "z[" + str(i) + "][" + str(c) + "][" + str(t) + "]"
+                z_var[i, c, t] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, name)
 
 
 def defineConstraints(
-    model, nConnections, nTimeSlots, x_var, t_var, I_var, affectance, beta, noise,
+    model,
+    nConnections,
+    nTimeSlots,
+    x_var,
+    t_var,
+    I_var,
+    Iij_var,
+    bigM,
+    z_var,
+    affectance,
+    beta,
+    noise,
 ):
-    print("a")
+    global nChannels
+
+    # Constraint one
+    for i in range(nTimeSlots - 1):
+        model.addConstr(t_var[i + 1] <= t_var[i])
+
+    # Constraint two
+    for i in range(nConnections):
+        expr = gp.LinExpr()
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                expr += x_var[i, c, t]
+
+        model.addConstr(expr == 1.0)
+
+    # Constraint three
+    for i in range(nConnections):
+        for t in range(nTimeSlots):
+            expr = gp.LinExpr()
+            for c in range(nChannels):
+                expr += x_var[i, c, t]
+
+            model.addConstr(expr <= t_var[t])
+
+    for i in range(nConnections):
+        for c1 in range(nChannels):
+            for t in range(nTimeSlots):
+                expr = gp.LinExpr()
+                for c2 in range(nChannels):
+                    if overlap[c1][c2] == 1:
+                        expr += x_var[i, c2, t]
+
+                model.addConstr(z_var[i, c1, t] == expr)
+
+    for i in range(nConnections):
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                expr = gp.LinExpr()
+
+                for u in range(nConnections):
+                    if u != i:
+                        expr += affectance[u][i] * x_var[u, c, t]
+
+                model.addConstr(Iij_var[i, c, t] == expr)
+
+    for i in range(nConnections):
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                model.addConstr(
+                    I_var[i] >= Iij_var[i, c, t] - bigM[i] * (1 - x_var[i, c, t])
+                )
+                model.addConstr(
+                    I_var[i] <= Iij_var[i, c, t] + bigM[i] * (1 - x_var[i, c, t])
+                )
 
 
-def defineObjectiveFunction(model, z_var, time_slots):
-    print("a")
+def defineObjectiveFunction(model, t_var, nTimeSlots):
+    obj_function = gp.LinExpr()
+
+    for i in range(nTimeSlots):
+        obj_function += t_var[i]
+
+    model.setObjective(obj_function, GRB.MINIMIZE)
+
+
+def computeBigM(nConnections, interferenceMatrix, distanceMatrix, affectance):
+    ret = []
+    for i in range(nConnections):
+        value = 0.0
+        for j in range(nConnections):
+            if i != j:
+                value += affectance[j][i]
+
+        ret.append(value)
+
+    return ret
 
 
 def optimization(
     nConnections,
-    time_slots,
+    nTimeSlots,
     SINR,
     power_sender,
     noise,
@@ -230,26 +342,30 @@ def optimization(
 ):
     global nChannels
     try:
-        model = gp.Model("md-vrbsp")
-        x_var, z_var, I_var = {}, {}, {}
+        model = gp.Model("md-vrbsp linear")
+        x_var, z_var, I_var, Iij_var, t_var = {}, {}, {}, {}, {}
+        bigM = computeBigM(nConnections, interferenceMatrix, distanceMatrix, affectance)
 
         defineVariables(
-            model, nConnections, time_slots, x_var, z_var, I_var,
+            model, nConnections, nTimeSlots, x_var, z_var, I_var, Iij_var, t_var
         )
 
         defineConstraints(
             model,
             nConnections,
-            time_slots,
+            nTimeSlots,
             x_var,
-            z_var,
+            t_var,
             I_var,
+            Iij_var,
+            bigM,
+            z_var,
             affectance,
             beta,
             noise,
         )
 
-        defineObjectiveFunction(model, z_var, time_slots)
+        defineObjectiveFunction(model, t_var, nTimeSlots)
 
         model.write("model.lp")
         model.setParam("TimeLimit", 3600)
@@ -288,7 +404,7 @@ if __name__ == "__main__":
 
         print(path)
 
-        noise, power_sender, alfa, nConnections, time_slots, beta = read_instance(
+        noise, power_sender, alfa, nConnections, nTimeSlots, beta = read_instance(
             path,
             receivers,
             senders,
@@ -302,7 +418,7 @@ if __name__ == "__main__":
 
         optimization(
             nConnections,
-            time_slots,
+            nTimeSlots,
             SINR,
             power_sender,
             noise,
