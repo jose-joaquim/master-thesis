@@ -173,15 +173,15 @@ def cToB(c):
     return 3
 
 
-def readAndCheck(file, nTimeSlots, nConnections, beta_ij):
+def readAndCheck(file, nTimeSlots, nConnections, dataRates, SINR):
     global nChannels
 
     connections = {}
     with open(file, "r") as f:
         for i in range(nConnections):
             aux = f.readline().split()
-            t, c, id_, interference = aux[0], aux[1], aux[2], aux[3]
-            connections[t, c].append([id_, interference])
+            t, c, id_, interference, comp_beta = aux[0], aux[1], aux[2], aux[3], aux[4]
+            connections[t, c].append([id_, interference, comp_beta])
 
     all_fine = True
     for t in range(nTimeSlots):
@@ -191,14 +191,35 @@ def readAndCheck(file, nTimeSlots, nConnections, beta_ij):
             # TODO: check how range() works
             for i in range(len(links) - 1, 0, -1):
                 interference = 0.0
+                id_i = links[i][0]
+                interference_i = links[i][1]
+                comp_beta_i = links[i][2]
+
                 for j in range(i):
                     interference += affectance[links[i]][links[j]]
 
-                bandwidth = cToB(c)
-                l_sinr = affectance[i][i] / (interference + noise)
+                # Checking interference
+                if interference != interference_i:
+                    print("ops")
+                    all_fine = False
+                    break
 
-                if beta_ij < l_sinr:
-                    print("problema")
+                bandwidth = cToB(c)
+                link_sinr = affectance[i][i] / (interference + noise)
+
+                # Descobrir b_ij minimo para transmitir com >= gamma_ij
+                b_ij = gammaToBeta(gamma_ij, dataRates, SINR, bandwidth)
+
+                if link_sinr < b_ij:
+                    print("ops 2")
+                    all_fine = False
+                    break
+
+                if b_ij < comp_beta_i:
+                    print("ops 3")
+                    all_fine = False
+                    break
+
 
     return all_fine
 
