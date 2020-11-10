@@ -59,7 +59,7 @@ def createInstance(TYPE, inst, n, dim):
     spectrums = [spec1, spec2, spec3]
 
     time_slots = n
-    beta = 3  # TODO: discutir melhor valor depois
+    gamma = secretsGenerator.uniform(6.5, 780.0)
     if TYPE == "VRBSP":
         time_slots = 1
     elif TYPE != "MD-VRBSP":
@@ -80,9 +80,9 @@ def createInstance(TYPE, inst, n, dim):
     if TYPE == "VRBSP":
         output += str(qtd_spectrum)
     elif TYPE == "MD-VRBSP":
-        output += str(beta) + " " + str(qtd_spectrum)
+        output += str(gamma) + " " + str(qtd_spectrum)
     else:
-        print("could not recognize problem type (beta)")
+        print("could not recognize problem type (gamma)")
         sys.exit(1)
 
     for i in range(qtd_spectrum):
