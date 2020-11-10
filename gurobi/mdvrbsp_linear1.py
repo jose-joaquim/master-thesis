@@ -86,6 +86,18 @@ def load_overlap():
             idx += 1
 
 
+def gammaToBeta(gamma, dataRates, SINR, bandwidth):
+    m = 8 if bandwidth == 20 else 9
+    last = 0
+
+    for i in range(m, -1, -1):
+        if dataRates[i][bandwidth] <= gamma:
+            last = i
+            break
+
+    return SINR[last][bandwidth]
+
+
 def read_instance(
     path,
     receivers,
@@ -104,7 +116,7 @@ def read_instance(
         alfa = float(aux[1])
         noise = float(aux[2])
         powerSender = float(aux[3])
-        beta = float(aux[4])
+        gamma = float(aux[4])
         n_spectrums = int(aux[5])
         specs = []
 
@@ -165,40 +177,15 @@ def read_instance(
             alfa,
         )
 
-        # for i in range(nConnections):
-        #     print(receivers[i])
-        #
-        # print("========================")
-        #
-        # for j in range(nConnections):
-        #     print(senders[j])
-        #
-        # print("========================")
-        #
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % distanceMatrix[i][j], end=" ")
-        #     print()
-        #
-        # print("========================")
-        #
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % interferenceMatrix[i][j], end=" ")
-        #     print()
-        #
-        # print("========================")
-
         for i in range(nConnections):
             affectance.append([])
             for j in range(nConnections):
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 affectance[i].append(value)
 
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % affectance[i][j], end=" ")
-        #     print()
+        beta = []
+        for bandwidth in range(4):
+            beta.append(gammaToBeta(gamma, dataRates, SINR, bandwidth))
 
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
