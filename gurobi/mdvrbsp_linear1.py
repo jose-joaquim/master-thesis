@@ -87,15 +87,18 @@ def load_overlap():
 
 
 def gammaToBeta(gamma, dataRates, SINR, bandwidth):
-    m = 8 if bandwidth == 20 else 9
-    last = 0
+    m = 9 if bandwidth == 20 else 10
 
-    for i in range(m, -1, -1):
-        if dataRates[i][bandwidth] <= gamma:
+    last = -1
+    for i in range(m):
+        if dataRates[i][bandwidth] >= gamma:
             last = i
             break
 
-    return SINR[last][bandwidth]
+    if last != -1:
+        return SINR[last][bandwidth]
+    else:  # There is no data-rate value greater or equal than gamma
+        return SINR[9][3] + 1.0
 
 
 def read_instance(

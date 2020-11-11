@@ -25,16 +25,31 @@ def distance(a, b, c, d):
     return math.hypot((a - c), (b - d))
 
 
-def gammaToBeta(gamma, dataRates, SINR, bandwidth):
-    m = 8 if bandwidth == 20 else 9
-    last = 0
+# def gammaToBeta(gamma, dataRates, SINR, bandwidth):
+#     m = 8 if bandwidth == 20 else 9
+#     last = 0
+#
+#     for i in range(m, -1, -1):
+#         if dataRates[i][bandwidth] <= gamma:
+#             last = i
+#             break
+#
+#     return SINR[last][bandwidth]
 
-    for i in range(m, -1, -1):
-        if dataRates[i][bandwidth] <= gamma:
+
+def gammaToBeta(gamma, dataRates, SINR, bandwidth):
+    m = 9 if bandwidth == 0 else 10
+
+    last = -1
+    for i in range(m):
+        if dataRates[i][bandwidth] >= gamma:
             last = i
             break
 
-    return SINR[last][bandwidth]
+    if last != -1:
+        return SINR[last][bandwidth]
+    else:  # There is no data-rate value greater or equal than gamma
+        return SINR[9][3] + 1.0
 
 
 def defineVariables(model, nConnections, nTimeSlots, x_var, t_var, I_var):
@@ -230,18 +245,16 @@ def read_instance(
             line = f.readline()
             aux = line.split()
 
-            dataRates.append([])
             for j in range(4):
-                dataRates.append(float(aux[j]))
+                dataRates[i][j] = float(aux[j])
 
         f.readline()
         for i in range(12):
             line = f.readline()
             aux = line.split()
 
-            SINR.append([])
             for j in range(4):
-                SINR[i].append(float(aux[j]))
+                SINR[i][j] = float(aux[j])
 
         convertTableToMW(SINR, SINR)
 
@@ -261,9 +274,9 @@ def read_instance(
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 affectance[i].append(value)
 
-        beta = []
-        for bandwidth_id in range(4):
-            beta.append(gammaToBeta(gamma, dataRates, SINR, bandwidth_id))
+        beta = [0.0 for _ in range(4)]
+        for i in range(4):
+            beta[i] = gammaToBeta(gamma, dataRates, SINR, i)
 
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
@@ -332,7 +345,9 @@ if __name__ == "__main__":
     load_overlap()
     for idx in range(1):
         receivers, senders, dataRates = [[]], [[]], [[]]
-        SINR, spectrums = [], []
+        dataRates = [[0 for i in range(4)] for _ in range(12)]
+        SINR = [[0 for i in range(4)] for _ in range(12)]
+        spectrums = [], []
         distanceMatrix, interferenceMatrix = [[]], [[]]
         affectance = [[]]
 

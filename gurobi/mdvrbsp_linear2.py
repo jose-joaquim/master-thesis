@@ -87,15 +87,18 @@ def load_overlap():
 
 
 def gammaToBeta(gamma, dataRates, SINR, bandwidth):
-    m = 8 if bandwidth == 20 else 9
-    last = 0
+    m = 9 if bandwidth == 20 else 10
 
-    for i in range(m, -1, -1):
-        if dataRates[i][bandwidth] <= gamma:
+    last = -1
+    for i in range(m):
+        if dataRates[i][bandwidth] >= gamma:
             last = i
             break
 
-    return SINR[last][bandwidth]
+    if last != -1:
+        return SINR[last][bandwidth]
+    else:  # There is no data-rate value greater or equal than gamma
+        return SINR[9][3] + 1.0
 
 
 def read_instance(
@@ -177,40 +180,11 @@ def read_instance(
             alfa,
         )
 
-        # for i in range(nConnections):
-        #     print(receivers[i])
-        #
-        # print("========================")
-        #
-        # for j in range(nConnections):
-        #     print(senders[j])
-        #
-        # print("========================")
-        #
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % distanceMatrix[i][j], end=" ")
-        #     print()
-        #
-        # print("========================")
-        #
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % interferenceMatrix[i][j], end=" ")
-        #     print()
-        #
-        # print("========================")
-
         for i in range(nConnections):
             affectance.append([])
             for j in range(nConnections):
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 affectance[i].append(value)
-
-        # for i in range(nConnections):
-        #     for j in range(nConnections):
-        #         print("%.4f " % affectance[i][j], end=" ")
-        #     print()
 
         beta = []
         for bandwidth in range(4):
