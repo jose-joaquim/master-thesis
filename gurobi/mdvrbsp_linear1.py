@@ -226,6 +226,17 @@ def defineVariables(
                 z_var[i, c, t] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, name)
 
 
+def cToBIdx(c):
+    if c <= 24:
+        return 0
+    elif c <= 36:
+        return 1
+    elif c <= 42:
+        return 2
+    else:
+        return 3
+
+
 def defineConstraints(
     model,
     nConnections,
@@ -264,6 +275,7 @@ def defineConstraints(
 
             model.addConstr(expr <= t_var[t])
 
+    # Constraint four
     for i in range(nConnections):
         for c1 in range(nChannels):
             for t in range(nTimeSlots):
@@ -274,6 +286,7 @@ def defineConstraints(
 
                 model.addConstr(z_var[i, c1, t] == expr)
 
+    # Constraint five
     for i in range(nConnections):
         for c in range(nChannels):
             for t in range(nTimeSlots):
@@ -285,6 +298,7 @@ def defineConstraints(
 
                 model.addConstr(Iij_var[i, c, t] == expr)
 
+    # Constraint six
     for i in range(nConnections):
         for c in range(nChannels):
             for t in range(nTimeSlots):
@@ -294,6 +308,17 @@ def defineConstraints(
                 model.addConstr(
                     I_var[i] <= Iij_var[i, c, t] + bigM[i] * (1 - x_var[i, c, t])
                 )
+
+    # Constraint seven
+    for i in range(nConnections):
+        expr = gp.LinExpr()
+
+        for c in range(nChannels):
+            for t in range(nTimeSlots):
+                value = (affectance[i][i] / beta[i][cToBIdx(c)]) - noise
+                expr += value * x_var[i, c, t]
+
+        model.addConstr(expr >= I_var[i])
 
 
 def defineObjectiveFunction(model, t_var, nTimeSlots):
