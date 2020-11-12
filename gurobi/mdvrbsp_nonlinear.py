@@ -25,18 +25,6 @@ def distance(a, b, c, d):
     return math.hypot((a - c), (b - d))
 
 
-# def gammaToBeta(gamma, dataRates, SINR, bandwidth):
-#     m = 8 if bandwidth == 20 else 9
-#     last = 0
-#
-#     for i in range(m, -1, -1):
-#         if dataRates[i][bandwidth] <= gamma:
-#             last = i
-#             break
-#
-#     return SINR[last][bandwidth]
-
-
 def gammaToBeta(gamma, dataRates, SINR, bandwidth):
     m = 9 if bandwidth == 0 else 10
 
@@ -76,6 +64,17 @@ def defineObjectiveFunction(model, t_var, nTimeSlots):
         obj_function += t_var[i]
 
     model.setObjective(obj_function, GRB.MINIMIZE)
+
+
+def cToBIdx(c):
+    if c <= 24:
+        return 0
+    elif c <= 36:
+        return 1
+    elif c <= 42:
+        return 2
+    else:
+        return 3
 
 
 def defineConstraints(
@@ -129,7 +128,7 @@ def defineConstraints(
 
         for c in range(nChannels):
             for t in range(nTimeSlots):
-                value = (affectance[i][i] / beta) - noise
+                value = (affectance[i][i] / beta[i][cToBIdx(c)]) - noise
                 expr += value * x_var[i, c, t]
 
         model.addConstr(expr >= I_var[i])
@@ -274,9 +273,10 @@ def read_instance(
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 affectance[i].append(value)
 
-        beta = [0.0 for _ in range(4)]
-        for i in range(4):
-            beta[i] = gammaToBeta(gamma, dataRates, SINR, i)
+        beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
+        for j in range(nConnections):
+            for i in range(4):
+                beta[j][i] = gammaToBeta(gamma, dataRates, SINR, i)
 
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
