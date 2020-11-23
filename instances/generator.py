@@ -59,30 +59,17 @@ def createInstance(TYPE, inst, n, dim):
     spectrums = [spec1, spec2, spec3]
 
     time_slots = n
-    gamma = secretsGenerator.uniform(6.5, 780.0)
     if TYPE == "VRBSP":
         time_slots = 1
     elif TYPE != "MD-VRBSP":
         print("could not recognize problem type (time_slots)")
         sys.exit(1)
 
-    output = (
-        str(n)
-        + " "
-        + str(alfa)
-        + " "
-        + str(noise)
-        + " "
-        + str(powerSender)
-        + " "
-    )
+    output = str(n) + " " + str(alfa) + " " + str(noise) + " " + str(powerSender) + " "
 
-    if TYPE == "VRBSP":
-        output += str(qtd_spectrum)
-    elif TYPE == "MD-VRBSP":
-        output += str(gamma) + " " + str(qtd_spectrum)
-    else:
-        print("could not recognize problem type (gamma)")
+    output += str(qtd_spectrum)
+    if TYPE != "VRBSP" and TYPE != "MD-VRBSP":
+        print("could not recognize problem type")
         sys.exit(1)
 
     for i in range(qtd_spectrum):
@@ -117,6 +104,13 @@ def createInstance(TYPE, inst, n, dim):
     f.write(
         "\n".join([" ".join([str(el[j]) for j in range(len(el))]) for el in senders])
     )
+
+    f.write("\n")
+
+    gamma = [secretsGenerator.uniform(0.0, 1201.0) for _ in range(n)]
+
+    f.write("\n")
+    f.write("\n".join(str(gamma[idx]) for idx in range(n)))
 
     f.write("\n\n")
     for i in range(len(dataRates)):
