@@ -1,43 +1,12 @@
 #! /usr/bin/env python3
 
 import gurobipy as gp
-import math
-import sys
 from gurobipy import GRB
 
-overlap = []
-nChannels = 45
-count_inst = 0
-rst_headers = [
-    "ObjVal",
-    "ObjBoundC",
-    "MIPGap",
-    "NumVars",
-    "NumConstrs",
-    "IterCount",
-    "BarIterCount",
-    "NodeCount",
-    "Runtime",
-]
-
-
-def distance(a, b, c, d):
-    return math.hypot((a - c), (b - d))
-
-
-def gammaToBeta(gamma, dataRates, SINR, bandwidth):
-    m = 9 if bandwidth == 0 else 10
-
-    last = -1
-    for i in range(m):
-        if dataRates[i][bandwidth] >= gamma:
-            last = i
-            break
-
-    if last != -1:
-        return SINR[last][bandwidth]
-    else:  # There is no data-rate value greater or equal than gamma
-        return SINR[9][3] + 1.0
+import mainmodule as mmod
+from mainmodule import overlap
+from mainmodule import nChannels
+from mainmodule import rst_headers
 
 
 def defineVariables(model, nConnections, nTimeSlots, x_var, t_var, I_var):
@@ -64,17 +33,6 @@ def defineObjectiveFunction(model, t_var, nTimeSlots):
         obj_function += t_var[i]
 
     model.setObjective(obj_function, GRB.MINIMIZE)
-
-
-def cToBIdx(c):
-    if c <= 24:
-        return 0
-    elif c <= 36:
-        return 1
-    elif c <= 42:
-        return 2
-    else:
-        return 3
 
 
 def defineConstraints(
@@ -143,157 +101,6 @@ def defineConstraints(
     #     model.addConstr(affectance[i][i] / (I_var[i] + noise) >= expr)
 
 
-def convertDBMToMW(noise):
-    b = noise / 10.0
-    result = math.pow(10.0, b)
-    return result
-
-
-def distanceAndInterference(
-    senders,
-    receivers,
-    interferenceMatrix,
-    distanceMatrix,
-    powerSender,
-    nConnections,
-    alfa,
-):
-    for i in range(nConnections):
-        distanceMatrix.append([])
-        interferenceMatrix.append([])
-        X_si = receivers[i][0]
-        Y_si = receivers[i][1]
-
-        for j in range(nConnections):
-            X_rj = senders[j][0]
-            Y_rj = senders[j][1]
-
-            dist = distance(X_si, Y_si, X_rj, Y_rj)
-            distanceMatrix[i].append(dist)
-
-            if i == j:
-                interferenceMatrix[i].append(0.0)
-            else:
-                value = powerSender / math.pow(dist, alfa) if dist != 0.0 else 1e9
-                interferenceMatrix[i].append(value)
-
-
-def convertTableToMW(SINR, SINR_):
-    for i in range(len(SINR_)):
-        for j in range(len(SINR_[i])):
-            if SINR[i][j] != 0.0:
-                b = SINR[i][j] / 10.0
-                result = math.pow(10.0, b)
-
-                SINR_[i][j] = result
-            else:
-                SINR_[i][j] = 0.0
-
-
-def read_instance(
-    path,
-    receivers,
-    senders,
-    dataRates,
-    SINR,
-    spectrums,
-    interferenceMatrix,
-    distanceMatrix,
-    affectance,
-):
-    with open(path, "r") as f:
-        aux = f.readline().split()
-        time_slots = int(aux[0])
-        nConnections = time_slots
-        alfa = float(aux[1])
-        noise = float(aux[2])
-        powerSender = float(aux[3])
-        gamma = float(aux[4])
-        n_spectrums = int(aux[5])
-        specs = []
-
-        for i in range(n_spectrums):
-            specs.append(int(aux[6 + i]))
-
-        if noise != 0.0:
-            noise = convertDBMToMW(noise)
-
-        # read receivers
-        # read senders
-        # read data-rates
-        # read SINR
-
-        f.readline()
-        for i in range(nConnections):
-            line = f.readline()
-            aux = line.split()
-            receivers.append([float(aux[0]), float(aux[1])])
-
-        del receivers[0]
-
-        f.readline()
-        for i in range(nConnections):
-            line = f.readline()
-            aux = line.split()
-            senders.append([float(aux[0]), float(aux[1])])
-
-        del senders[0]
-
-        f.readline()
-        for i in range(12):
-            line = f.readline()
-            aux = line.split()
-
-            for j in range(4):
-                dataRates[i][j] = float(aux[j])
-
-        f.readline()
-        for i in range(12):
-            line = f.readline()
-            aux = line.split()
-
-            for j in range(4):
-                SINR[i][j] = float(aux[j])
-
-        convertTableToMW(SINR, SINR)
-
-        distanceAndInterference(
-            senders,
-            receivers,
-            interferenceMatrix,
-            distanceMatrix,
-            powerSender,
-            nConnections,
-            alfa,
-        )
-
-        for i in range(nConnections):
-            affectance.append([])
-            for j in range(nConnections):
-                value = powerSender / math.pow(distanceMatrix[i][j], alfa)
-                affectance[i].append(value)
-
-        beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
-        for j in range(nConnections):
-            for i in range(4):
-                beta[j][i] = gammaToBeta(gamma, dataRates, SINR, i)
-
-        return noise, powerSender, alfa, nConnections, time_slots, beta
-
-
-def load_overlap():
-    with open("./overlap.txt", "r") as f:
-        idx = 0
-        for line in f:
-            aux = line.split(",")
-            arr_aux = []
-            for j in range(len(aux)):
-                arr_aux.append(int(aux[j]))
-
-            overlap.append(arr_aux)
-            idx += 1
-
-
 def optimization(
     nConnections,
     time_slots,
@@ -332,6 +139,25 @@ def optimization(
         model.write("model.lp")
         model.setParam("TimeLimit", 3600)
         model.optimize()
+
+        with open("result_information.txt", "a") as output_re:
+            for i in range(len(rst_headers) - 1):
+                output_re.write(str(model.getAttr(rst_headers[i])) + " ")
+            output_re.write(str(model.getAttr(rst_headers[len(rst_headers) - 1])))
+            output_re.write("\n")
+
+        file_name = "out-formatted" + str(count_inst) + ".txt"
+        # conn, channel, MCS, interference
+        with open(file_name, "a") as f:
+            f.write(str(model.getAttr(GRB.Attr.ObjVal)) + "\n")
+            for i in range(nConnections):
+                for c in range(nChannels):
+                    for t in range(time_slots):
+                        if x_var[i, c, t].getAttr("x") == 1.0:
+                            f.write(
+                                "%d %d %d %.12f\n" % (i, c, t, I_var[i].getAttr("x"))
+                            )
+
         model.write("solution.sol")
 
     except gp.GurobiError as e:
@@ -342,18 +168,27 @@ def optimization(
 
 
 if __name__ == "__main__":
-    load_overlap()
+    mmod.load_overlap()
+
+    with open("result_information.txt", "a") as f:
+        for i in range(len(rst_headers) - 1):
+            f.write(rst_headers[i] + " ")
+        f.write(rst_headers[len(rst_headers) - 1] + "\n")
+
     for idx in range(1):
-        receivers, senders, dataRates = [[]], [[]], [[]]
+        U_n = 16
+
+        receivers = [[0 for i in range(2)] for _ in range(U_n)]
+        senders = [[0 for i in range(2)] for _ in range(U_n)]
         dataRates = [[0 for i in range(4)] for _ in range(12)]
         SINR = [[0 for i in range(4)] for _ in range(12)]
-        spectrums = [], []
-        distanceMatrix, interferenceMatrix = [[]], [[]]
-        affectance = [[]]
+        affectance = [[0 for i in range(U_n)] for _ in range(U_n)]
+        distanceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
+        interferenceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
+        gamma = [0 for i in range(U_n)]
 
         inst = idx + 1
-        U_n = 8
-        p_type = "MDVRBSP"
+        p_type = "MD-VRBSP"
         path = (
             "../instances/md-vrbsp/U_"
             + str(U_n)
@@ -368,27 +203,27 @@ if __name__ == "__main__":
 
         print(path)
 
-        noise, power_sender, alfa, nConnections, time_slots, beta = read_instance(
+        noise, power_sender, alfa, nConnections, time_slots, beta = mmod.read_instance(
             path,
             receivers,
             senders,
+            gamma,
             dataRates,
             SINR,
-            spectrums,
             interferenceMatrix,
             distanceMatrix,
             affectance,
         )
 
-        optimization(
-            nConnections,
-            time_slots,
-            SINR,
-            power_sender,
-            noise,
-            beta,
-            interferenceMatrix,
-            distanceMatrix,
-            affectance,
-            dataRates,
-        )
+        # optimization(
+        #     nConnections,
+        #     time_slots,
+        #     SINR,
+        #     power_sender,
+        #     noise,
+        #     beta,
+        #     interferenceMatrix,
+        #     distanceMatrix,
+        #     affectance,
+        #     dataRates,
+        # )
