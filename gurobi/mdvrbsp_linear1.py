@@ -98,7 +98,7 @@ def defineConstraints(
 
                 for u in range(nConnections):
                     if u != i:
-                        expr += affectance[u][i] * x_var[u, c, t]
+                        expr += affectance[u][i] * z_var[u, c, t]
 
                 model.addConstr(Iij_var[i, c, t] == expr)
 
