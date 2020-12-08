@@ -1,4 +1,4 @@
-path_results="results/md-vrbsp/U_"
+path_results="results/vrbsp/U_"
 for inst in 8;
 do
     lower=1
@@ -7,6 +7,6 @@ do
     do
         path_results_final=${path_results}${inst};
         echo $path_results_final
-        ./mdvrbsp_linear1.py ${inst} ${v} ${path_results_final}
+        ./vrbsp_new.py ${inst} ${v} ${path_results_final}
     done;
 done
