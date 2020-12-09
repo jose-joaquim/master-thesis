@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import sys
+
 import gurobipy as gp
 import math
 from gurobipy import GRB
@@ -312,7 +313,8 @@ def modelF1_v2(
         model.setParam("TimeLimit", 3600)
         model.optimize()
 
-        with open("result_information.txt", "a") as output_re:
+        file_ri = to_write + "/result_information.txt"
+        with open(file_ri, "a") as output_re:
             for i in range(len(rst_headers) - 1):
                 output_re.write(str(model.getAttr(rst_headers[i])) + " ")
             output_re.write(str(model.getAttr(rst_headers[len(rst_headers) - 1])))
@@ -321,6 +323,7 @@ def modelF1_v2(
         file_name = to_write + "/out-formatted" + str(inst) + ".txt"
         # conn, canal, bw, interference
         with open(file_name, "a") as f:
+            f.write(str(model.getAttr(GRB.Attr.ObjVal)) + "\n")
             for i in range(nConnections):
                 for c in range(nChannels):
                     nMCS = 10 if cToB(c) != 0 else 9
