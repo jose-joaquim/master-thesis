@@ -1,3 +1,5 @@
+#! /bin/bash
+
 path_results="results/md-vrbsp/U_"
 for inst in 8;
 do

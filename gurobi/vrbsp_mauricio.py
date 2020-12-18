@@ -351,9 +351,9 @@ def modelF1_v2(
         )
         defineObjectiveFunction(model, nConnections, dataRates, y)
 
-        # model.write("./formulation" + str(count_inst) + ".lp")
-        # model.setParam("LogFile", file_name)
-        # model.setParam(GRB.Param.LogToConsole, False)
+        file_log = to_write + "/log-inst" + str(inst) + ".txt"
+        model.setParam("LogFile", file_log)
+        model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 3600)
         model.optimize()
 
