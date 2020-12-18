@@ -263,14 +263,7 @@ if __name__ == "__main__":
 
     print(path)
 
-    (
-        noise,
-        power_sender,
-        alfa,
-        nConnections,
-        nTimeSlots,
-        beta,
-    ) = mmod.read_instance(
+    (noise, power_sender, alfa, nConnections, nTimeSlots, beta,) = mmod.read_instance(
         path,
         receivers,
         senders,
@@ -289,7 +282,7 @@ if __name__ == "__main__":
 
     optimization(
         nConnections,
-        ans, #nTimeSlots,
+        ans,  # nTimeSlots,
         SINR,
         power_sender,
         noise,

@@ -5,7 +5,6 @@ import copy
 overlap = []
 nChannels = 45
 rst_headers = [
-    "Inst"
     "ObjVal",
     "ObjBoundC",
     "MIPGap",
