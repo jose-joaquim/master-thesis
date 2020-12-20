@@ -11,7 +11,6 @@ from mainmodule import rst_headers
 
 
 def defineVariables(model, nConnections, nTimeSlots, x_var, z_var, I_var, t_var, w_var):
-    global nChannels
     for i in range(nTimeSlots):
         name = "t[" + str(i) + "]"
         t_var[i] = model.addVar(0.0, 1.0, 1.0, GRB.BINARY, name)
@@ -52,8 +51,6 @@ def defineConstraints(
     beta,
     noise,
 ):
-    global nChannels
-
     # Constraint one
     for i in range(nTimeSlots - 1):
         model.addConstr(t_var[i + 1] <= t_var[i])
@@ -112,7 +109,7 @@ def defineConstraints(
 
         for c in range(nChannels):
             for t in range(nTimeSlots):
-                value = (affectance[i][i] / beta[i][cToBIdx(c)]) - noise
+                value = (affectance[i][i] / beta[i][mmod.cToBIdx(c)]) - noise
                 expr += value * x_var[i, c, t]
 
         model.addConstr(expr >= I_var[i])
@@ -141,7 +138,6 @@ def optimization(
     inst,
     to_write,
 ):
-    global nChannels
     try:
         model = gp.Model("md-vrbsp linear [Glover and Wolsey 1974]")
         x_var, z_var, I_var, t_var, w_var = {}, {}, {}, {}, {}
