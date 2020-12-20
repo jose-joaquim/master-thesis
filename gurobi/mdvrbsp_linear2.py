@@ -138,6 +138,8 @@ def optimization(
     distanceMatrix,
     affectance,
     dataRates,
+    inst,
+    to_write,
 ):
     global nChannels
     try:
@@ -164,17 +166,22 @@ def optimization(
 
         defineObjectiveFunction(model, t_var, nTimeSlots)
 
-        model.write("model.lp")
+        # model.write("model.lp")
+        file_log = to_write + "/log-inst" + str(inst) + ".txt"
+        model.setParam("LogFile", file_log)
+        model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 3600)
         model.optimize()
 
-        with open("result_information.txt", "a") as output_re:
+        file_ri = to_write + "/result_information.txt"
+        with open(file_ri, "a") as output_re:
+            output_re.write(str(inst) + " ")
             for i in range(len(rst_headers) - 1):
                 output_re.write(str(model.getAttr(rst_headers[i])) + " ")
             output_re.write(str(model.getAttr(rst_headers[len(rst_headers) - 1])))
             output_re.write("\n")
 
-        file_name = "out-formatted" + str(count_inst) + ".txt"
+        file_name = to_write + "/out-formatted" + str(inst) + ".txt"
         # conn, channel, MCS, interference
         with open(file_name, "a") as f:
             f.write(str(model.getAttr(GRB.Attr.ObjVal)) + "\n")
@@ -186,7 +193,7 @@ def optimization(
                                 "%d %d %d %.12f\n" % (i, c, t, I_var[i].getAttr("x"))
                             )
 
-        model.write("solution.sol")
+        # model.write("solution.sol")
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
