@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import sys
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -195,56 +196,72 @@ def optimization(
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("argument error")
+        sys.exit(1)
+
     mmod.load_overlap()
-    for idx in range(1):
-        inst = idx + 1
-        U_n = 64
 
-        receivers = [[0 for i in range(2)] for _ in range(U_n)]
-        senders = [[0 for i in range(2)] for _ in range(U_n)]
-        dataRates = [[0 for i in range(4)] for _ in range(12)]
-        SINR = [[0 for i in range(4)] for _ in range(12)]
-        affectance = [[0 for i in range(U_n)] for _ in range(U_n)]
-        distanceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
-        interferenceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
-        gamma = [0 for i in range(U_n)]
+    # with open("result_information.txt", "a") as f:
+    #     for i in range(len(rst_headers) - 1):
+    #         f.write(rst_headers[i] + " ")
+    #     f.write(rst_headers[len(rst_headers) - 1] + "\n")
 
-        p_type = "MD-VRBSP"
-        path = (
-            "../instances/md-vrbsp/U_"
-            + str(U_n)
-            + "/"
-            + p_type
-            + "_U_"
-            + str(U_n)
-            + "_"
-            + str(inst)
-            + ".txt"
-        )
+    U_n = int(sys.argv[1])
 
-        print(path)
+    receivers = [[0 for i in range(2)] for _ in range(U_n)]
+    senders = [[0 for i in range(2)] for _ in range(U_n)]
+    dataRates = [[0 for i in range(4)] for _ in range(12)]
+    SINR = [[0 for i in range(4)] for _ in range(12)]
+    affectance = [[0 for i in range(U_n)] for _ in range(U_n)]
+    distanceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
+    interferenceMatrix = [[0 for i in range(U_n)] for _ in range(U_n)]
+    gamma = [0 for i in range(U_n)]
 
-        noise, power_sender, alfa, nConnections, nTimeSlots, beta = mmod.read_instance(
-            path,
-            receivers,
-            senders,
-            gamma,
-            dataRates,
-            SINR,
-            interferenceMatrix,
-            distanceMatrix,
-            affectance,
-        )
+    inst = sys.argv[2]
+    p_type = "MD-VRBSP"
+    path = (
+        "../instances/md-vrbsp/U_"
+        + str(U_n)
+        + "/"
+        + p_type
+        + "_U_"
+        + str(U_n)
+        + "_"
+        + str(inst)
+        + ".txt"
+    )
 
-        # optimization(
-        #     nConnections,
-        #     nTimeSlots,
-        #     SINR,
-        #     power_sender,
-        #     noise,
-        #     beta,
-        #     interferenceMatrix,
-        #     distanceMatrix,
-        #     affectance,
-        #     dataRates,
-        # )
+    print(path)
+
+    (noise, power_sender, alfa, nConnections, nTimeSlots, beta,) = mmod.read_instance(
+        path,
+        receivers,
+        senders,
+        gamma,
+        dataRates,
+        SINR,
+        interferenceMatrix,
+        distanceMatrix,
+        affectance,
+    )
+
+    ans = mmod.determineTimeSlots(
+        nConnections, interferenceMatrix, affectance, noise, beta, SINR
+    )
+    print(ans)
+
+    optimization(
+        nConnections,
+        ans,  # nTimeSlots,
+        SINR,
+        power_sender,
+        noise,
+        beta,
+        interferenceMatrix,
+        distanceMatrix,
+        affectance,
+        dataRates,
+        inst,
+        sys.argv[3],
+    )
