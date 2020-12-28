@@ -96,7 +96,7 @@ def load_overlap():
 
 def gammaToBeta(gamma, dataRates, SINR, bandwidth):
     # print(gamma, bandwidth)
-    m = 11
+    m = 12
 
     last = -1
     for i in range(m):
