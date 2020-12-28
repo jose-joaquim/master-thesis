@@ -1,11 +1,12 @@
 #! /bin/bash
 
-path_results="results/md-vrbsp/U_"
-for inst in 8;
+path_results="results/md-vrbsp-linear1/U_"
+
+lower=1
+upper=5
+for ((v=lower;v<=upper;v++));
 do
-    lower=1
-    upper=1
-    for ((v=lower;v<=upper;v++));
+    for inst in 128 256 512;
     do
         path_results_final=${path_results}${inst};
         echo $path_results_final
