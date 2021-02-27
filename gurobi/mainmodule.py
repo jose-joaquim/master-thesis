@@ -265,12 +265,6 @@ def insertLinkInto(
 def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta, SINR):
     global nChannels
 
-    # for i in range(nConnections):
-    #     print("beta id %d:" % i)
-    #     for j in range(4):
-    #         print(" %.4f" % beta[i][j], end="")
-    #     print("")
-
     nTimeSlots = 0
     links = {}
     firstChannel = [0, 25, 37, 43]
@@ -281,7 +275,7 @@ def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta
     order = [x[1] for x in to_sort]
     # print(order)
     for i in range(nConnections):
-        # print("encaixando conexao " + str(i))
+        # print("encaixando conexao " + str(order[i]))
         ok = False
         for t in range(nTimeSlots):
             if ok:
@@ -293,8 +287,8 @@ def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta
                 #     "   testando " + str(i) + " em (" + str(t) + " " + str(c) + ")"
                 # )
                 # print(to_print)
-                if (c, t) in links:
-                    insertedLinks = copy.deepcopy(links[c, t])
+                if (t, c) in links:
+                    insertedLinks = copy.deepcopy(links[t, c])
 
                 ok = insertLinkInto(
                     insertedLinks,
@@ -313,23 +307,21 @@ def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta
                 # )
 
                 if ok:
-                    links[c, t] = copy.deepcopy(insertedLinks)
+                    links[t, c] = copy.deepcopy(insertedLinks)
                     # print("coloquei em [" + str(t) + ", " + str(c) + "]")
                     break
 
         if not ok:
             nTimeSlots += 1
-            # print("      CRIEI NOVO TIME-SLOT")
-            # print("coloquei em [" + str(t) + ", " + str(c) + "]")
+            # print("      CRIEI NOVO TIME-SLOT")            
             # Insert link in the new time slot in a compatible channel
             for idx in range(len(maxSINR)):
                 if maxSINR[idx] >= beta[order[i]][idx]:
-                    links[firstChannel[idx], nTimeSlots] = [order[i]]
+                    links[nTimeSlots, firstChannel[idx]] = [order[i]]
+                    # print("coloquei em [" + str(nTimeSlots) + ", " + str(firstChannel[idx]) + "]")
+                    break
 
     # for key in links:
     #     print(key, "->", links[key])
-
-    # print("links")
-    # print(links[0, 0])
 
     return nTimeSlots + 1

@@ -1,2 +1,11 @@
+vrbsp:
+	g++ -std=c++11 -o vrbsp_vns vrbsp_vns.cpp
+
 mdvrbsp:
-	g++ -std=c++11 -o md-vrbsp_vns md-vrbsp_vns.cpp
+	g++ -D MDVRBSP -std=c++11 mdvrbsp_vns.cpp -o mdvrbsp_vns
+
+vrcheck:
+	g++ -std=c++11 -o check feasibility_check.cpp
+
+mdcheck:
+	g++ -D MDVRBSP -std=c++11 -o check feasibility_check.cpp

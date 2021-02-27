@@ -48,8 +48,6 @@ def distanceAndInterference(
     alfa,
 ):
     for i in range(nConnections):
-        # distanceMatrix.append([])
-        # interferenceMatrix.append([])
         X_si = receivers[i][0]
         Y_si = receivers[i][1]
 
@@ -58,7 +56,6 @@ def distanceAndInterference(
             Y_rj = senders[j][1]
 
             dist = distance(X_si, Y_si, X_rj, Y_rj)
-            # distanceMatrix[i].append(dist)
             distanceMatrix[i][j] = dist
 
             if i == j:
@@ -189,7 +186,7 @@ def defineVariables(model, nConnections, x, y, z, w, I, I_c):
 
     for i in range(nConnections):
         for b in range(4):
-            MCS = 10 if b != 0 else 9
+            MCS = 12
             for m in range(MCS):
                 name = "y[" + str(i) + "][" + str(b) + "][" + str(m) + "]"
                 y[i, b, m] = model.addVar(0.0, 1.0, 1.0, GRB.BINARY, name)
@@ -258,7 +255,7 @@ def defineConstraints(
     for b in range(4):
         for i in range(nConnections):
             expr1, expr2 = gp.LinExpr(), gp.LinExpr()
-            nMCS = 10 if b != 0 else 9
+            nMCS = 12
             for m in range(nMCS):
                 expr1 += y[i, b, m]
 
@@ -304,7 +301,7 @@ def defineConstraints(
     for i in range(nConnections):
         expr = gp.LinExpr()
         for b in range(4):
-            nDataRates = 9 if b == 0 else 10
+            nDataRates = 12
             for m in range(nDataRates):
                 value = powerSender / math.pow(distanceMatrix[i][i], alfa)
                 value /= SINR[m][b]
@@ -320,7 +317,7 @@ def defineObjectiveFunction(model, nConnections, dataRates, y):
 
     for i in range(nConnections):
         for b in range(4):
-            nMCS = 10 if b != 0 else 9
+            nMCS = 12
             for m in range(nMCS):
                 objFunction += dataRates[m][b] * y[i, b, m]
 
@@ -370,7 +367,7 @@ def modelF1_v2(
             f.write(str(model.getAttr(GRB.Attr.ObjVal)) + "\n")
             for i in range(nConnections):
                 for b in range(4):
-                    nMCS = 10 if b != 0 else 9
+                    nMCS = 12
                     for m in range(nMCS):
                         if y[i, b, m].getAttr("x") == 1.0:
                             normal = False

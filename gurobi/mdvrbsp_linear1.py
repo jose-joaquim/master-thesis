@@ -187,11 +187,11 @@ def optimization(
 
         defineObjectiveFunction(model, t_var, nTimeSlots)
 
-        # model.write("model.lp")
+        model.write("model.lp")
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
-        model.setParam("LogToConsole", 0)
-        model.setParam("TimeLimit", 3600)
+        # model.setParam("LogToConsole", 0)
+        model.setParam("TimeLimit", 60)
         model.optimize()
 
         file_ri = to_write + "/result_information.txt"
@@ -202,6 +202,7 @@ def optimization(
             output_re.write(str(model.getAttr(rst_headers[len(rst_headers) - 1])))
             output_re.write("\n")
 
+        model.write("solution.sol")
         file_name = to_write + "/out-formatted" + str(inst) + ".txt"
         # conn, channel, MCS, interference
         with open(file_name, "a") as f:
@@ -209,12 +210,11 @@ def optimization(
             for i in range(nConnections):
                 for c in range(nChannels):
                     for t in range(nTimeSlots):
+                        # print("%d %d %d" % (i, c, t))
                         if x_var[i, c, t].getAttr("x") == 1.0:
                             f.write(
                                 "%d %d %d %.12f\n" % (i, c, t, I_var[i].getAttr("x"))
                             )
-
-        # model.write("solution.sol")
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
@@ -282,7 +282,7 @@ if __name__ == "__main__":
 
     optimization(
         nConnections,
-        ans,  # nTimeSlots,
+        1,  # nTimeSlots,
         SINR,
         power_sender,
         noise,

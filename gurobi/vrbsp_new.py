@@ -184,7 +184,7 @@ def defineVariables(model, nConnections, x, z, w, I, I_c):
 
     for i in range(nConnections):
         for c in range(nChannels):
-            for m in range(10):
+            for m in range(12):
                 name = "x[" + str(i) + "][" + str(c) + "][" + str(m) + "]"
                 x[i, c, m] = model.addVar(0.0, 1.0, 1.0, GRB.BINARY, name)
 
@@ -204,7 +204,7 @@ def defineVariables(model, nConnections, x, z, w, I, I_c):
 
 
 def defineConstraints(
-        model, nConnections, SINR, powerSender, noise, x, z, w, I, I_c,
+    model, nConnections, SINR, powerSender, noise, x, z, w, I, I_c,
 ):
     global overlap, nChannels
 
@@ -212,7 +212,7 @@ def defineConstraints(
     for i in range(nConnections):
         expr = gp.LinExpr()
         for c in range(nChannels):
-            nMCS = 10 if cToB(c) != 0 else 9
+            nMCS = 12
             for m in range(nMCS):
                 expr = expr + x[i, c, m]
 
@@ -221,7 +221,7 @@ def defineConstraints(
     # Constraint 2
     for i in range(nConnections):
         for c1 in range(nChannels):
-            nMCS = 10 if cToB(c1) != 0 else 9
+            nMCS = 12
             exp = gp.LinExpr()
             for c2 in range(nChannels):
                 for m in range(nMCS):
@@ -241,7 +241,7 @@ def defineConstraints(
     # Constraint 4
     for i in range(nConnections):
         for c in range(nChannels):
-            nDataRates = 10 if cToB(c) != 0 else 9
+            nDataRates = 12
             for m in range(nDataRates):
                 lin_exp = gp.LinExpr()
                 lin_exp = I_c[i, c] - M_ij[i] * (1 - x[i, c, m])
@@ -250,7 +250,7 @@ def defineConstraints(
     # Constraint 5
     for i in range(nConnections):
         for c in range(nChannels):
-            nDataRates = 10 if cToB(c) != 0 else 9
+            nDataRates = 12
             for m in range(nDataRates):
                 lin_exp = gp.LinExpr()
                 lin_exp = I_c[i, c] + M_ij[i] * (1 - x[i, c, m])
@@ -260,7 +260,7 @@ def defineConstraints(
     for i in range(nConnections):
         expr = gp.LinExpr()
         for c in range(nChannels):
-            nDataRates = 9 if cToB(c) == 0 else 10
+            nDataRates = 12
             for m in range(nDataRates):
                 value = powerSender / math.pow(distanceMatrix[i][i], alfa)
                 value /= SINR[m][cToB(c)]
@@ -276,7 +276,7 @@ def defineObjectiveFunction(model, nConnections, dataRates, x):
 
     for i in range(nConnections):
         for c in range(nChannels):
-            nMCS = 10 if cToB(c) != 0 else 9
+            nMCS = 12
             for m in range(nMCS):
                 objFunction += dataRates[m][cToB(c)] * x[i, c, m]
 
@@ -309,7 +309,7 @@ def modelF1_v2(
 
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
-        model.setParam("LogToConsole", 0)
+        # model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 3600)
         model.optimize()
 
@@ -326,13 +326,15 @@ def modelF1_v2(
             f.write(str(model.getAttr(GRB.Attr.ObjVal)) + "\n")
             for i in range(nConnections):
                 for c in range(nChannels):
-                    nMCS = 10 if cToB(c) != 0 else 9
+                    nMCS = 12
                     for m in range(nMCS):
                         if x[i, c, m].getAttr("x") == 1.0:
                             f.write(
                                 "%d %d %d %d %.12lf\n"
                                 % (i, c, cToB(c), m, I[i].getAttr("x"))
                             )
+
+        model.write("solution.sol")
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
@@ -411,5 +413,5 @@ if __name__ == "__main__":
         SINR,
         powerSender,
         noise,
-        sys.argv[3]
+        sys.argv[3],
     )
