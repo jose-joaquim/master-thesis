@@ -265,63 +265,93 @@ def insertLinkInto(
 def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta, SINR):
     global nChannels
 
-    nTimeSlots = 0
-    links = {}
-    firstChannel = [0, 25, 37, 43]
-    maxSINR = [SINR[11][idx] for idx in range(4)]
+    ans = []
 
-    to_sort = [(affectance[idx][idx], idx) for idx in range(nConnections)]
-    to_sort.sort()
-    order = [x[1] for x in to_sort]
-    # print(order)
+    return ans
+
+
+#     nTimeSlots = 0
+#     links = {}
+#     firstChannel = [0, 25, 37, 43]
+#     maxSINR = [SINR[11][idx] for idx in range(4)]
+#
+#     to_sort = [(affectance[idx][idx], idx) for idx in range(nConnections)]
+#     to_sort.sort()
+#     order = [x[1] for x in to_sort]
+#     # print(order)
+#     for i in range(nConnections):
+#         # print("encaixando conexao " + str(order[i]))
+#         ok = False
+#         for t in range(nTimeSlots):
+#             if ok:
+#                 break
+#
+#             for c in range(nChannels):
+#                 insertedLinks = []
+#                 # to_print = (
+#                 #     "   testando " + str(i) + " em (" + str(t) + " " + str(c) + ")"
+#                 # )
+#                 # print(to_print)
+#                 if (t, c) in links:
+#                     insertedLinks = copy.deepcopy(links[t, c])
+#
+#                 ok = insertLinkInto(
+#                     insertedLinks,
+#                     order[i],
+#                     t,
+#                     c,
+#                     interferenceMatrix,
+#                     affectance,
+#                     noise,
+#                     beta,
+#                     SINR,
+#                 )
+#
+#                 # print(
+#                 #     "      ->>> em (" + str(t) + ", " + str(c) + ") retornou " + str(ok)
+#                 # )
+#
+#                 if ok:
+#                     links[t, c] = copy.deepcopy(insertedLinks)
+#                     # print("coloquei em [" + str(t) + ", " + str(c) + "]")
+#                     break
+#
+#         if not ok:
+#             nTimeSlots += 1
+#             # print("      CRIEI NOVO TIME-SLOT")
+#             # Insert link in the new time slot in a compatible channel
+#             for idx in range(len(maxSINR)):
+#                 if maxSINR[idx] >= beta[order[i]][idx]:
+#                     links[nTimeSlots, firstChannel[idx]] = [order[i]]
+#                     # print("coloquei em [" + str(nTimeSlots) + ", " + str(firstChannel[idx]) + "]")
+#                     break
+#
+#     # for key in links:
+#     #     print(key, "->", links[key])
+#
+#     return nTimeSlots + 1
+
+
+def average_spec_qtd(nConnections, gamma, dataRates):
+    used_spec = 0
     for i in range(nConnections):
-        # print("encaixando conexao " + str(order[i]))
-        ok = False
-        for t in range(nTimeSlots):
-            if ok:
+        bw = 0
+        for j in range(4):
+            if dataRates[11][j] >= gamma[i]:
+                if j == 0:
+                    bw = 20
+                elif j == 1:
+                    bw = 40
+                elif j == 2:
+                    bw = 80
+                elif j == 3:
+                    bw = 160
+
                 break
 
-            for c in range(nChannels):
-                insertedLinks = []
-                # to_print = (
-                #     "   testando " + str(i) + " em (" + str(t) + " " + str(c) + ")"
-                # )
-                # print(to_print)
-                if (t, c) in links:
-                    insertedLinks = copy.deepcopy(links[t, c])
+        used_spec = used_spec + bw
 
-                ok = insertLinkInto(
-                    insertedLinks,
-                    order[i],
-                    t,
-                    c,
-                    interferenceMatrix,
-                    affectance,
-                    noise,
-                    beta,
-                    SINR,
-                )
+    number_times = math.ceil(used_spec / 500)
+    print("USEI %f ceil de %d" % (number_times, used_spec))
 
-                # print(
-                #     "      ->>> em (" + str(t) + ", " + str(c) + ") retornou " + str(ok)
-                # )
-
-                if ok:
-                    links[t, c] = copy.deepcopy(insertedLinks)
-                    # print("coloquei em [" + str(t) + ", " + str(c) + "]")
-                    break
-
-        if not ok:
-            nTimeSlots += 1
-            # print("      CRIEI NOVO TIME-SLOT")            
-            # Insert link in the new time slot in a compatible channel
-            for idx in range(len(maxSINR)):
-                if maxSINR[idx] >= beta[order[i]][idx]:
-                    links[nTimeSlots, firstChannel[idx]] = [order[i]]
-                    # print("coloquei em [" + str(nTimeSlots) + ", " + str(firstChannel[idx]) + "]")
-                    break
-
-    # for key in links:
-    #     print(key, "->", links[key])
-
-    return nTimeSlots + 1
+    return number_times

@@ -225,7 +225,7 @@ def optimization(
 
 # instance, interval 1, path_results
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print("argument error")
         sys.exit(1)
 
@@ -275,14 +275,20 @@ if __name__ == "__main__":
         affectance,
     )
 
-    ans = mmod.determineTimeSlots(
-        nConnections, interferenceMatrix, affectance, noise, beta, SINR
-    )
-    print(ans)
+    ans = 0
+    if int(sys.argv[4]) == 1:
+        ans = mmod.average_spec_qtd(nConnections, gamma, dataRates)
+    elif int(sys.argv[4]) == 0:
+        ans = mmod.determineTimeSlots(
+            nConnections, interferenceMatrix, affectance, noise, beta, SINR
+        )
+    else:
+        print("invalid time-slot generator")
+        sys.exit(1)
 
     optimization(
         nConnections,
-        1,  # nTimeSlots,
+        ans,
         SINR,
         power_sender,
         noise,
