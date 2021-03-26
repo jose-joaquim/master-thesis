@@ -1,7 +1,7 @@
 #! /bin/bash
 
 make mdvrbsp
-make mdcheck
+# make mdcheck
 path_results="results/vns-vrbsp/U_"
 
 max_time=10
@@ -15,9 +15,10 @@ do
         path_results_final=${path_results}${inst};
         echo $path_results_final
         mkdir -p ${path_results_final}
-        ./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}
+        # ./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}
+        ./mdvrbsp_vns ${inst} ${v}
 
-        sol_file="solution.txt"
-        ./check ${inst} ${v} ${sol_file}
+        # sol_file="solution.txt"
+        # ./check ${inst} ${v} ${sol_file}
     done;
 done;

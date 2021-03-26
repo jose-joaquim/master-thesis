@@ -397,29 +397,42 @@ void read_data() {
         }
     }
 #endif
+}
 
-    for (int i = 0; i < n_connections; i++) {
-        for (int j = 0; j < n_connections; j++) {
-            printf("%lf ", distanceMatrix[i][j]);
-        }
-        puts("");
+void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
+    if (file == nullptr) {
+        file = fopen("./solution_gurobi.txt", "w");
     }
 
-    puts("");
-    for (int i = 0; i < n_connections; i++) {
-        for (int j = 0; j < n_connections; j++) {
-            printf("%lf ", interferenceMatrix[i][j]);
+    fprintf(file, "%d\n", int(sol.slots.size()));
+    
+    for (const TimeSlot &ts : sol.slots) {
+        vector<string> lines;
+        for (const Spectrum &sp : ts.spectrums) {
+            for (const Channel &ch : sp.channels) {
+                if (ch.connections.empty())
+                    continue;
+                
+                string line = to_string(ch.bandwidth) + " ";
+                
+                for (int i = 0; i < ch.connections.size() - 1; i++) {
+                    line += (to_string(ch.connections[i].id) + " ");
+                }
+
+                line += to_string(ch.connections.back().id);
+                lines.emplace_back(line + "\n");
+            }
         }
-        puts("");
+
+        fprintf(file, "%d\n", int(lines.size()));
+        for (const string &line : lines) {
+            fprintf(file, "%s", line.c_str());
+        }
     }
 
-    puts("");
-    for (int i = 0; i < 12; i++) {
-        for (int j = 0; j < 4; j++) {
-            printf("%lf ", SINR[i][j]);
-        }
-        puts("");
-    }
+    
+    
+    fclose(file);
 }
 
 void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
@@ -461,7 +474,7 @@ double computeConnectionThroughput(Connection &conn, int bandwidth, bool force =
         double conn_SINR = (powerSender / pow(conn.distanceSR, alfa)) / (conn.interference + noise);
         conn.SINR = conn_SINR;
 
-        printf("%lf %.10lf %lf %lf %lf %lf %lf\n", powerSender, conn.distanceSR, alfa, pow(conn.distanceSR, alfa), conn.interference, noise, conn_SINR);
+        // printf("%lf %.10lf %lf %lf %lf %lf %lf\n", powerSender, conn.distanceSR, alfa, pow(conn.distanceSR, alfa), conn.interference, noise, conn_SINR);
 
         mcs = 11;
         while (mcs > 0 && conn_SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here

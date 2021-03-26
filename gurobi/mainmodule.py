@@ -15,6 +15,7 @@ rst_headers = [
     "NodeCount",
     "Runtime",
 ]
+ch_intervals = [[0, 24], [25, 37], [38, 43], [44, 45]]
 
 
 def cToBIdx(c):
@@ -262,74 +263,103 @@ def insertLinkInto(
     return True
 
 
-def determineTimeSlots(nConnections, interferenceMatrix, affectance, noise, beta, SINR):
-    global nChannels
+def read_from_file():
+    # TODO: The order of the insertion matters in the construction
+    print("reading from file")
+    single_spec = [160, 240, 100]
+    used_specs = [single_spec.copy()]
+    conns_schedule = {}
+    qtd_slots = 0
 
-    ans = []
+    list_of_channels = []
+    with open("./warm.txt", "r") as f:
+        qtd_slots = int(f.readline())
+        print("tem %d slots" % (qtd_slots))
+        for slot in range(qtd_slots):
+            qtd_channel = int(f.readline())
+            # print("tem %d canais" % (qtd_channel))
+            for ch in range(qtd_channel):
+                aux = f.readline().split()
+                # print(aux)
+                list_of_channels.append(aux)
 
-    return ans
+    list_of_channels.sort()
+    for el in list_of_channels:
+        bw = int(el[0])
 
+        for conn in range(1, len(el)):
+            go_next = False
+            print("tentando inserir conn %s" % el[conn])
+            for ts in range(len(used_specs)):
+                if go_next:
+                    break
 
-#     nTimeSlots = 0
-#     links = {}
-#     firstChannel = [0, 25, 37, 43]
-#     maxSINR = [SINR[11][idx] for idx in range(4)]
-#
-#     to_sort = [(affectance[idx][idx], idx) for idx in range(nConnections)]
-#     to_sort.sort()
-#     order = [x[1] for x in to_sort]
-#     # print(order)
-#     for i in range(nConnections):
-#         # print("encaixando conexao " + str(order[i]))
-#         ok = False
-#         for t in range(nTimeSlots):
-#             if ok:
-#                 break
-#
-#             for c in range(nChannels):
-#                 insertedLinks = []
-#                 # to_print = (
-#                 #     "   testando " + str(i) + " em (" + str(t) + " " + str(c) + ")"
-#                 # )
-#                 # print(to_print)
-#                 if (t, c) in links:
-#                     insertedLinks = copy.deepcopy(links[t, c])
-#
-#                 ok = insertLinkInto(
-#                     insertedLinks,
-#                     order[i],
-#                     t,
-#                     c,
-#                     interferenceMatrix,
-#                     affectance,
-#                     noise,
-#                     beta,
-#                     SINR,
-#                 )
-#
-#                 # print(
-#                 #     "      ->>> em (" + str(t) + ", " + str(c) + ") retornou " + str(ok)
-#                 # )
-#
-#                 if ok:
-#                     links[t, c] = copy.deepcopy(insertedLinks)
-#                     # print("coloquei em [" + str(t) + ", " + str(c) + "]")
-#                     break
-#
-#         if not ok:
-#             nTimeSlots += 1
-#             # print("      CRIEI NOVO TIME-SLOT")
-#             # Insert link in the new time slot in a compatible channel
-#             for idx in range(len(maxSINR)):
-#                 if maxSINR[idx] >= beta[order[i]][idx]:
-#                     links[nTimeSlots, firstChannel[idx]] = [order[i]]
-#                     # print("coloquei em [" + str(nTimeSlots) + ", " + str(firstChannel[idx]) + "]")
-#                     break
-#
-#     # for key in links:
-#     #     print(key, "->", links[key])
-#
-#     return nTimeSlots + 1
+                for sp in range(len(used_specs[ts])):
+                    print("nesse spec slice tem %d livres" % (used_specs[ts][sp]))
+                    if used_specs[ts][sp] >= bw:
+                        used_specs[ts][sp] -= bw
+                        print("inseri em (%d, %d)" % (ts, sp))
+                        if (ts, sp) in conns_schedule:
+                            conns_schedule[(ts, sp)].append(el[conn])
+                        else:
+                            conns_schedule[(ts, sp)] = [bw, el[conn]]
+
+                        go_next = True
+                        break
+
+            if not go_next:  # Need an additional time-slot
+                print(" CRIEI SLOT A MAIS")
+                used_specs.append(single_spec.copy())
+                used_specs[-1][0] -= bw
+                conns_schedule[(len(used_specs) - 1, 0)] = [bw, el[conn]]
+                print("inseri em (%d, %d)" % (len(used_specs) - 1, 0))
+
+    # with open("./warm.txt", "r") as f:
+    #     qtd_slots = int(f.readline())
+    #     print("tem %d slots" % (qtd_slots))
+    #     for slot in range(qtd_slots):
+    #         qtd_channel = int(f.readline())
+    #         print("tem %d canais" % (qtd_channel))
+    #         for ch in range(qtd_channel):
+    #             aux = f.readline().split()
+    #             print("   um canal com:", end="")
+    #             print(aux)
+    #             bw = int(aux[0])
+    #
+    #             for conn in range(1, len(aux)):
+    #                 go_next = False
+    #                 print("tentando inserir conn %s" % aux[conn])
+    #                 for ts in range(len(used_specs)):
+    #                     if go_next:
+    #                         break
+    #
+    #                     for sp in range(len(used_specs[ts])):
+    #                         print(
+    #                             "nesse spec slice tem %d livres" % (used_specs[ts][sp])
+    #                         )
+    #                         if used_specs[ts][sp] >= bw:
+    #                             used_specs[ts][sp] -= bw
+    #                             print("inseri em (%d, %d)" % (ts, sp))
+    #                             if (ts, sp) in conns_schedule:
+    #                                 conns_schedule[(ts, sp)].append(aux[conn])
+    #                             else:
+    #                                 conns_schedule[(ts, sp)] = [bw, aux[conn]]
+    #
+    #                             go_next = True
+    #                             break
+    #
+    #                 if not go_next:  # Need an additional time-slot
+    #                     print(" CRIEI SLOT A MAIS")
+    #                     used_specs.append(single_spec.copy())
+    #                     used_specs[-1][0] -= bw
+    #                     conns_schedule[(len(used_specs) - 1, 0)] = [bw, aux[conn]]
+    #                     print("inseri em (%d, %d)" % (len(used_specs) - 1, 0))
+
+    if len(used_specs) > qtd_slots:
+        print("MORE SLOTS THAN ALLOWED. EXITING PROGRAM...")
+        sys.exit(1)
+
+    return qtd_slots, conns_schedule
 
 
 def average_spec_qtd(nConnections, gamma, dataRates):

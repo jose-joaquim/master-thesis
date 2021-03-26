@@ -138,53 +138,56 @@ Solution vns() {
     // ~~~~~~~~~~~~~~~~~~~~~~~`
     
     Solution init_sol = constructive_heuristic(); // TODO (?)
-    return init_sol;
-    // Solution delta = convertTo20MhzSol(init_sol); // DONE
-    // 
-    // Solution rep = multipleRepresentation(delta); // DONE
-    // setDP(rep);
-    // double retOF = calcDP(rep);
-    // 
-    // // Then, reconstruct optimal local solution
-    // Solution incumbent = reconstruct_sol(rep); // DONE
-    // incumbent.throughput = init_sol.throughput;
-    // 
-    // Solution local_max = delta;
-    // 
-    // int K_MUL = max(1, n_connections / 100);
-    // int K_MAX = 10;
-    // startTime = clock();
-    // while (!stop()) {
-    //     int k = 1;
-    //     while (!stop() && k <= K_MAX) {
-    //         delta = local_max;
-    // 
-    //         perturbation(delta, k * K_MUL); // DONE
-    //         Solution multiple = multipleRepresentation(delta); // DONE
-    //         
-    //         setDP(multiple);
-    //         delta.throughput = calcDP(multiple);
-    //         
-    //         printf("%lf %lf\n", incumbent.throughput, delta.throughput);
-    //         
-    //         Solution explicit_sol = local_search(multiple, delta); // TODO
-    //         fix_channels(explicit_sol);                            // DONE
-    // 
-    //         delta = convertTo20MhzSol(explicit_sol); // DONE
-    //         if (delta > local_max) {
-    //             k = 1;
-    //             local_max = delta;
-    //         } else {
-    //             k += 1;
-    //         }
-    //         
-    //         if (local_max > incumbent) {
-    //             incumbent = explicit_sol;
-    //         }
-    //     }
-    // }
-    // 
-    // return incumbent;
+    Solution delta = convertTo20MhzSol(init_sol); // DONE
+    
+    Solution rep = multipleRepresentation(delta); // DONE
+    setDP(rep);
+    double retOF = calcDP(rep);
+    
+    // Then, reconstruct optimal local solution
+    Solution incumbent = reconstruct_sol(rep); // DONE
+    incumbent.throughput = init_sol.throughput;
+    
+    Solution local_max = delta;
+    
+    int K_MUL = max(1, n_connections / 100);
+    int K_MAX = 10;
+    startTime = clock();
+    while (!stop()) {
+        int k = 1;
+        while (!stop() && k <= K_MAX) {
+            delta = local_max;
+    
+            perturbation(delta, k * K_MUL); // DONE
+            Solution multiple = multipleRepresentation(delta); // DONE
+            
+            setDP(multiple);
+            delta.throughput = calcDP(multiple);
+            
+            // printf("%lf %lf\n", incumbent.throughput, delta.throughput);
+            
+            Solution explicit_sol = local_search(multiple, delta); // TODO
+            fix_channels(explicit_sol);                            // DONE
+    
+            delta = convertTo20MhzSol(explicit_sol); // DONE
+            assert(essentiallyEqual(explicit_sol.throughput, delta.throughput));
+            // printf("opa %lf %lf\n", delta.throughput, local_max.throughput);
+            if (definitelyGreaterThan(delta.throughput, local_max.throughput)) {
+                printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+                k = 1;
+                local_max = delta;
+            } else {
+                k += 1;
+            }
+            
+            if (definitelyGreaterThan(local_max.throughput, incumbent.throughput)) {
+                printf("melhorei! %lf => %lf\n", incumbent.throughput, local_max.throughput);
+                incumbent = explicit_sol;
+            }
+        }
+    }
+    
+    return incumbent;
 }
 
 int main(int argc, char **argv) {

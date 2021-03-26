@@ -309,11 +309,10 @@ def modelF1_v2(
 
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
-        # model.setParam("LogToConsole", 0)
+        model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 3600)
         model.optimize()
 
-        return
         file_ri = to_write + "/result_information.txt"
         with open(file_ri, "a") as output_re:
             for i in range(len(rst_headers) - 1):

@@ -84,7 +84,7 @@ Solution constructive_heuristic() {
                     if (can_split(ret.slots[t].spectrums[s].channels[c])) {
                         vector<Channel> ch_split =
                             split(ret.slots[t].spectrums[s].channels[c]); // TODO
-                        
+
                         cp_channel = ch_split[0];
                         success = try_insert(conn, cp_channel);
 
@@ -168,51 +168,71 @@ Solution vns() {
     //         : 3) update
 
     Solution init_sol = constructive_heuristic(); // TODO (?)
-    Solution delta = convertTo20MhzSol(init_sol); // DONE
+    compute_violation(init_sol);
+    
+    if (essentiallyEqual(init_sol.violation, 0.0)) {
+        puts("opa");
+        return init_sol;
+    }
 
-    // // Find best partitioning
-    // Solution multi_rep = multipleRepresentation(delta); // DONE
-    // runDP(multi_rep);                                      // DONE
-    //
-    // // Then, reconstruct optimal local solution
-    // Solution global_max = reconstruct_sol(multi_rep); // DONE
-    // Solution local_max = delta;
-    //
-    // int K_MUL = max(1, n_connections / 100);
-    // int K_MAX = 10;
-    // startTime = clock();
-    // while (!stop()) {
-    //     int k = 1;
-    //     while (!stop() && k <= K_MAX) {
-    //         delta = local_min;
-    //
-    //         delete_time_slot(delta);
-    //         perturbation(delta, k * K_MUL);            // DONE
-    //         multi_rep = multipleRepresentation(delta); // DONE
-    //         runDP(multi_rep);                             // DONE
-    //
-    //         Solution explicit_sol = local_search(multi_rep, delta); // TODO
-    //         fix_channels(explicit_sol);                                // DONE
-    //
-    //         delta = convertTo20MhzSol(explicit_sol); // DONE
-    //
-    //         if (delta < local_min) {
-    //             k = 1;
-    //             local_min = delta;
-    //         } else {
-    //             k += 1;
-    //         }
-    //         if (local_min < global_min) {
-    //             global_min = explicit_sol;
-    //         }
-    //     }
-    // }
-    //
-    // return global_min;
+    Solution delta = convertTo20MhzSol(init_sol); // DONE
+    Solution rep = multipleRepresentation(delta); // DONE
+    setDP(rep);
+    double retOF = calcDP(rep);
+
+    // Then, reconstruct optimal local solution
+    Solution incumbent = reconstruct_sol(rep); // DONE
+    incumbent.throughput = init_sol.throughput;
+
+    Solution local_min = delta;
+
+    int K_MUL = max(1, n_connections / 100);
+    int K_MAX = 10;
+    startTime = clock();
+    while (!stop()) {
+        int k = 1;
+        while (!stop() && k <= K_MAX) {
+            delta = local_min;
+
+            delete_time_slot(delta);
+            perturbation(delta, k * K_MUL);            // DONE
+            compute_violation(delta);
+
+            if (essentiallyEqual(delta.violation, 0)) {
+                puts("hm");
+                return delta;
+            }
+            
+            Solution multiple = multipleRepresentation(delta); // DONE
+            
+            setDP(multiple);
+            delta.throughput = calcDP(multiple);
+            
+            // printf("%lf %lf\n", incumbent.throughput, delta.throughput);
+            
+            Solution explicit_sol = local_search(multiple, delta); // TODO
+            fix_channels(explicit_sol);                            // DONE
+
+            compute_violation(delta);    
+            delta = convertTo20MhzSol(explicit_sol); // DONE
+
+            if (definitelyLessThan(delta.violation, local_min.violation)) {
+                k = 1;
+                local_min = delta;
+            } else {
+                k += 1;
+            }
+            if (definitelyLessThan(local_min.violation, incumbent.violation)) {
+                incumbent = explicit_sol;
+            }
+        }
+    }
+
+    return incumbent;
 }
 
 int main(int argc, char **argv) {
-    if (argc != 5) {
+    if (argc != 3 && argc != 5) {
         puts("argument error");
         return 1;
     }
@@ -224,9 +244,20 @@ int main(int argc, char **argv) {
     path_input += "_";
     path_input += string(argv[2]);
     path_input += ".txt";
-
     freopen(path_input.c_str(), "r", stdin);
-    read_data(); // Input will be redirected in the command call
+    read_data();
+    
+    //program_name, instance, version
+    if (argc == 3) {
+        puts("executing only constructive heuristic and printing results...");
+        Solution ch = constructive_heuristic();
+        FILE *aux = fopen("../gurobi/warm.txt", "w");
+        print_solution(ch);
+        print_solution_to_gurobi(ch, aux); 
+        return 0;
+    }
+
+    maximumTime = stoi(argv[4]) * 1.0;
     vns();
     return 0;
 }

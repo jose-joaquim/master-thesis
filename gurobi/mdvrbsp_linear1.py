@@ -11,6 +11,18 @@ from mainmodule import nChannels
 from mainmodule import rst_headers
 
 
+box_channels = [
+    [[0, 1, 2, 3, 4, 5, 6, 7], [25, 26, 27, 28], [37, 38], [43]],
+    [
+        [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+        [29, 30, 31, 32, 33, 34],
+        [39, 40, 41],
+        [44],
+    ],
+    [[20, 21, 22, 23, 24], [35, 36], [42]],
+]
+
+
 def defineVariables(
     model, nConnections, nTimeSlots, x_var, z_var, I_var, Iij_var, t_var
 ):
@@ -147,9 +159,21 @@ def computeBigM(nConnections, interferenceMatrix, distanceMatrix, affectance):
     return ret
 
 
+def bwToIdx(key):
+    if key <= 20:
+        return 0
+    elif key <= 40:
+        return 1
+    elif key <= 80:
+        return 2
+    elif key <= 160:
+        return 3
+
+
 def optimization(
     nConnections,
     nTimeSlots,
+    dic,
     SINR,
     power_sender,
     noise,
@@ -187,10 +211,47 @@ def optimization(
 
         defineObjectiveFunction(model, t_var, nTimeSlots)
 
+        # Set some values in x_var...
+        used_channels = {}
+        for key in dic:
+            print(key, dic[key])
+            bw = dic[key][0]
+            bwIdx = bwToIdx(bw)
+
+            predefined_channels = box_channels[int(key[1])][int(bwIdx)]
+
+            print(predefined_channels)
+            for el_1 in predefined_channels:
+                ok = False if key in used_channels else True
+
+                if not ok:
+                    for el_2 in used_channels[key]:
+                        if overlap[el_1][el_2] == 1:
+                            ok = True
+                            break
+
+                if ok is True:
+                    print("inseri %d" % (el_1))
+                    if key in used_channels:
+                        used_channels[key].append(el_1)
+                    else:
+                        used_channels[key] = [el_1]
+
+                    for conns_id in dic[key][1:]:
+                        print(
+                            "ajustei valor de [%s, %d, %d]" % (conns_id, el_1, key[0])
+                        )
+                        x_var[int(conns_id), el_1, key[0]].start = 1.0
+                        t_var[key[0]].start = 1.0
+                    break
+                else:
+                    print("opa deu erro")
+                    return
+
         model.write("model.lp")
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
-        # model.setParam("LogToConsole", 0)
+        model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 60)
         model.optimize()
 
@@ -230,11 +291,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     mmod.load_overlap()
-
-    # with open("result_information.txt", "a") as f:
-    #     for i in range(len(rst_headers) - 1):
-    #         f.write(rst_headers[i] + " ")
-    #     f.write(rst_headers[len(rst_headers) - 1] + "\n")
 
     U_n = int(sys.argv[1])
 
@@ -276,12 +332,12 @@ if __name__ == "__main__":
     )
 
     ans = 0
+    dic = {}
     if int(sys.argv[4]) == 1:
         ans = mmod.average_spec_qtd(nConnections, gamma, dataRates)
     elif int(sys.argv[4]) == 0:
-        ans = mmod.determineTimeSlots(
-            nConnections, interferenceMatrix, affectance, noise, beta, SINR
-        )
+        ans, dic = mmod.read_from_file()
+        print("opa " + str(ans))
     else:
         print("invalid time-slot generator")
         sys.exit(1)
@@ -289,6 +345,7 @@ if __name__ == "__main__":
     optimization(
         nConnections,
         ans,
+        dic,
         SINR,
         power_sender,
         noise,
