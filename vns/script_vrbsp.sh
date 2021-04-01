@@ -4,13 +4,13 @@ make vrbsp
 # make vrcheck
 path_results="results/vns-vrbsp/U_"
 
-max_time=10
+max_time=600
 
 lower=1
-upper=1
+upper=5
 for ((v=lower;v<=upper;v++));
 do
-    for inst in 16;
+    for inst in 8 16 32;
     do
         path_results_final=${path_results}${inst};
         echo $path_results_final

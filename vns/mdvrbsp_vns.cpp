@@ -170,10 +170,10 @@ Solution vns() {
     Solution init_sol = constructive_heuristic(); // TODO (?)
     compute_violation(init_sol);
     
-    if (essentiallyEqual(init_sol.violation, 0.0)) {
-        puts("opa");
-        return init_sol;
-    }
+    // if (essentiallyEqual(init_sol.violation, 0.0)) {
+    //     puts("opa");
+    //     return init_sol;
+    // }
 
     Solution delta = convertTo20MhzSol(init_sol); // DONE
     Solution rep = multipleRepresentation(delta); // DONE
@@ -194,7 +194,9 @@ Solution vns() {
         while (!stop() && k <= K_MAX) {
             delta = local_min;
 
-            delete_time_slot(delta);
+            if (delta.slots.size() > 0)
+                delete_time_slot(delta);
+            
             perturbation(delta, k * K_MUL);            // DONE
             compute_violation(delta);
 
@@ -216,6 +218,7 @@ Solution vns() {
             compute_violation(delta);    
             delta = convertTo20MhzSol(explicit_sol); // DONE
 
+            cout << delta.violation << " " << local_min.violation << endl;
             if (definitelyLessThan(delta.violation, local_min.violation)) {
                 k = 1;
                 local_min = delta;
@@ -223,6 +226,7 @@ Solution vns() {
                 k += 1;
             }
             if (definitelyLessThan(local_min.violation, incumbent.violation)) {
+                printf("melhorei %.3lf %.3lf\n", local_min.violation, incumbent.violation);
                 incumbent = explicit_sol;
             }
         }

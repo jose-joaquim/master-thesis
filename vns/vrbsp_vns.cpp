@@ -148,8 +148,8 @@ Solution vns() {
     Solution incumbent = reconstruct_sol(rep); // DONE
     incumbent.throughput = init_sol.throughput;
     
-    Solution local_max = delta;
-    
+    Solution local_max = incumbent;
+    double old_value = incumbent.throughput;
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
     startTime = clock();
@@ -173,7 +173,7 @@ Solution vns() {
             assert(essentiallyEqual(explicit_sol.throughput, delta.throughput));
             // printf("opa %lf %lf\n", delta.throughput, local_max.throughput);
             if (definitelyGreaterThan(delta.throughput, local_max.throughput)) {
-                printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+                // printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
                 k = 1;
                 local_max = delta;
             } else {
@@ -181,12 +181,14 @@ Solution vns() {
             }
             
             if (definitelyGreaterThan(local_max.throughput, incumbent.throughput)) {
-                printf("melhorei! %lf => %lf\n", incumbent.throughput, local_max.throughput);
+                // printf("melhorei! %lf => %lf\n", incumbent.throughput, local_max.throughput);
                 incumbent = explicit_sol;
             }
         }
     }
-    
+
+    double output_value = incumbent.throughput;
+    printf("%.3lf %.3lf\n", old_value, output_value);
     return incumbent;
 }
 
@@ -208,7 +210,9 @@ int main(int argc, char **argv) {
     maximumTime = stoi(argv[4]) * 1.0;
     read_data(); // Input will be redirected in the command call
     Solution aux = vns();
-
-    print_solution(aux);
+    
+    // print_solution(aux);
+    FILE *file_out = fopen(argv[3], "w");
+    print_solution_to_file(aux);
     return 0;
 }

@@ -178,6 +178,7 @@ double compute_violation(Solution &sol) {
         for (const Spectrum &sp : ts.spectrums) {
             for (const Channel &ch : sp.channels) {
                 for (const Connection &conn : ch.connections) {
+                    double res = gma[conn.id] - conn.throughput;
                     sol.violation = max(sol.violation, gma[conn.id] - conn.throughput);
                 }
             }
