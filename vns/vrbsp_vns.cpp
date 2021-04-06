@@ -212,7 +212,11 @@ int main(int argc, char **argv) {
     Solution aux = vns();
     
     // print_solution(aux);
-    FILE *file_out = fopen(argv[3], "w");
-    print_solution_to_file(aux);
+    string path_out = string(argv[3]);
+    path_out += "/solution" + string(argv[2]);
+    path_out += ".txt";
+    cout << path_out << endl;
+    FILE *file_out = fopen(path_out.c_str(), "w");
+    print_solution_to_file(aux, file_out);
     return 0;
 }
