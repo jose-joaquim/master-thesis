@@ -253,6 +253,7 @@ def optimization(
         model.setParam("LogFile", file_log)
         model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 60)
+        model.setParam("IntFeasTol", 1e-7)
         model.optimize()
 
         file_ri = to_write + "/result_information.txt"

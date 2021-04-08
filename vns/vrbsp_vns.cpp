@@ -218,5 +218,11 @@ int main(int argc, char **argv) {
     cout << path_out << endl;
     FILE *file_out = fopen(path_out.c_str(), "w");
     print_solution_to_file(aux, file_out);
+
+    string path_obj = string(argv[3]);
+    path_obj += "/objectives.txt";
+    cout << path_obj << endl;
+    FILE *file_obj = fopen(path_obj.c_str(), "a");
+    print_objective_to_file(aux, file_obj);
     return 0;
 }

@@ -400,6 +400,20 @@ void read_data() {
 #endif
 }
 
+void print_objective_to_file(const Solution &sol, FILE *file = nullptr) {
+    if (file == nullptr) {
+        file = fopen("./objectives.txt", "a");
+    }
+
+#ifdef MDVRBSP
+    fprintf(file, "%lf\n", sol.violation);
+#else
+    fprintf(file, "%lf\n", sol.throughput);
+#endif
+    
+    fclose(file);
+}
+
 void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
     if (file == nullptr) {
         file = fopen("./solution_gurobi.txt", "w");

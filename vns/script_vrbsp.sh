@@ -7,7 +7,7 @@ path_results="results/vns-vrbsp/U_"
 max_time=1
 
 lower=1
-upper=1
+upper=2
 for ((v=lower;v<=upper;v++));
 do
     for inst in 16;
