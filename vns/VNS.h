@@ -609,6 +609,14 @@ void print_solution(Solution &sol, bool ok = true) {
         }
         printf("}\n");
     }
+
+    if (!sol.unscheduled.empty()) {
+        puts("conexoes unscheduled:");
+        for (int id : sol.unscheduled) {
+            printf(" %d", id);
+        }
+        puts("");
+    }
 }
 
 void recoverSolution(int k, int i, int j, bool clean) {
@@ -1105,10 +1113,8 @@ void remove_timeslot(Solution &curr) {
 inline void perturbation(Solution &sol, int kkmul) {
     int rnd = rng.randInt(1);
     if (rnd) {
-        // puts("entrei 1");
         K_AddDrop(sol, kkmul);
     } else {
-        // puts("entrei 2");
         K_RemoveAndInserts(sol, kkmul);
     }
 
@@ -1118,6 +1124,8 @@ inline void perturbation(Solution &sol, int kkmul) {
 void init(void);
 
 Solution vns(void);
+
+Solution vns(string);
 
 Solution constructive_heuristic(void);
 

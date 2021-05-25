@@ -4,10 +4,10 @@ make vrbsp
 # make vrcheck
 path_results="results/vns-vrbsp/U_"
 
-max_time=1
+max_time=10
 
 lower=1
-upper=2
+upper=1
 for ((v=lower;v<=upper;v++));
 do
     for inst in 16;

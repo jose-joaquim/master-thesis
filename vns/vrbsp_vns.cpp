@@ -2,7 +2,6 @@
 
 using namespace std;
 
-
 Solution constructive_heuristic() {
     Solution ret(init_conf, 0.0, true);
     vector<int> links;
@@ -21,7 +20,7 @@ Solution constructive_heuristic() {
         ii where = {-1, -1};
         bool isSplit = false, inserted = false;
         int bestBandwidthSplit = -1, bandwidthSplit = -1;
-    
+
         for (int s = 0; s < retCopy.slots[0].spectrums.size(); s++) {
             for (int c = 0; c < retCopy.slots[0].spectrums[s].channels.size(); c++) {
                 const Channel &currentChannel = retCopy.slots[0].spectrums[s].channels[c];
@@ -31,10 +30,10 @@ Solution constructive_heuristic() {
                 vector<Channel> channelSplit;
                 if (channelInserted.bandwidth >= 40) {
                     channelSplit = split(currentChannel);
-    
+
                     Channel split0 = insertInChannel(channelSplit[0], conn);
                     Channel split1 = insertInChannel(channelSplit[1], conn);
-    
+
                     int op = 0;
                     double conf1 = split0.throughput + channelSplit[1].throughput;
                     double conf2 = split1.throughput + channelSplit[0].throughput;
@@ -59,24 +58,26 @@ Solution constructive_heuristic() {
                     betterSplit = (channelSplit[0].throughput + channelSplit[1].throughput) >
                                   channelInserted.throughput;
                 }
-    
+
                 bandwidthSplit =
                     betterSplit ? currentChannel.bandwidth / 2 : currentChannel.bandwidth;
                 double totalThroughputIteration =
                     bestThroughputSoFar - currentChannel.throughput + ammount;
 
                 bool cond1 = totalThroughputIteration > bestThroughputIteration;
-                bool cond2 = approximatelyEqual(totalThroughputIteration, bestThroughputIteration) &&
-                             bandwidthSplit > bestBandwidthSplit;
-                bool cond3 = approximatelyEqual(totalThroughputIteration, bestThroughputIteration) &&
-                             (bandwidthSplit == bestBandwidthSplit) && betterSplit == false &&
-                             isSplit == true;
-    
+                bool cond2 =
+                    approximatelyEqual(totalThroughputIteration, bestThroughputIteration) &&
+                    bandwidthSplit > bestBandwidthSplit;
+                bool cond3 =
+                    approximatelyEqual(totalThroughputIteration, bestThroughputIteration) &&
+                    (bandwidthSplit == bestBandwidthSplit) && betterSplit == false &&
+                    isSplit == true;
+
                 if (cond1 || cond2 || cond3) {
                     bestThroughputIteration = totalThroughputIteration;
                     inserted = true;
                     where = {s, c};
-    
+
                     bestBandwidthSplit = bandwidthSplit;
                     if (betterSplit) {
                         isSplit = true;
@@ -88,10 +89,10 @@ Solution constructive_heuristic() {
                 }
             }
         }
-    
+
         double aux = bestThroughputSoFar;
         bestThroughputSoFar = bestThroughputIteration;
-    
+
         if (inserted) {
             if (isSplit) {
                 retCopy.slots[0].spectrums[where.first].channels.erase(
@@ -103,7 +104,7 @@ Solution constructive_heuristic() {
                 retCopy.slots[0].spectrums[where.first].channels[where.second] = bestChannel;
             }
             computeThroughput(retCopy);
-    
+
             if (!approximatelyEqual(retCopy.throughput, bestThroughputSoFar)) {
                 printf("vixe %.3lf %.3lf\n", retCopy.throughput, bestThroughputSoFar);
             }
@@ -124,7 +125,7 @@ Solution constructive_heuristic() {
     return ret;
 }
 
-Solution vns() {
+Solution vns(string filePrefix) {
     // 1st step: constructive heuristic
     // 2nd step: dp algorithm
     // 3rd step: local search
@@ -134,22 +135,28 @@ Solution vns() {
     //         : 3) update
 
     // ~~~~~~~~~~~~~~~~~~~~~~~`
-    //TODO: ===============>> O THROUGHPUT DE UMA SOLUCAO EH O RETORNADO PELA DP!!!
+    // TODO: ===============>> O THROUGHPUT DE UMA SOLUCAO EH O RETORNADO PELA DP!!!
     // ~~~~~~~~~~~~~~~~~~~~~~~`
-    
+
+    FILE *file_comparative = nullptr;
+    if (!filePrefix.empty())
+        file_comparative = fopen(filePrefix.c_str(), "w");
+
     Solution init_sol = constructive_heuristic(); // TODO (?)
     Solution delta = convertTo20MhzSol(init_sol); // DONE
-    
+
     Solution rep = multipleRepresentation(delta); // DONE
     setDP(rep);
     double retOF = calcDP(rep);
-    
+
     // Then, reconstruct optimal local solution
     Solution incumbent = reconstruct_sol(rep); // DONE
     incumbent.throughput = init_sol.throughput;
-    
+
     Solution local_max = incumbent;
     double old_value = incumbent.throughput;
+    fprintf(file_comparative, "%lf %lf\n", 0.0, old_value);
+
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
     startTime = clock();
@@ -157,18 +164,18 @@ Solution vns() {
         int k = 1;
         while (!stop() && k <= K_MAX) {
             delta = local_max;
-    
-            perturbation(delta, k * K_MUL); // DONE
+
+            perturbation(delta, k * K_MUL);                    // DONE
             Solution multiple = multipleRepresentation(delta); // DONE
-            
+
             setDP(multiple);
             delta.throughput = calcDP(multiple);
-            
+
             // printf("%lf %lf\n", incumbent.throughput, delta.throughput);
-            
+
             Solution explicit_sol = local_search(multiple, delta); // TODO
             fix_channels(explicit_sol);                            // DONE
-    
+
             delta = convertTo20MhzSol(explicit_sol); // DONE
             assert(essentiallyEqual(explicit_sol.throughput, delta.throughput));
             // printf("opa %lf %lf\n", delta.throughput, local_max.throughput);
@@ -179,16 +186,21 @@ Solution vns() {
             } else {
                 k += 1;
             }
-            
+
             if (definitelyGreaterThan(local_max.throughput, incumbent.throughput)) {
-                // printf("melhorei! %lf => %lf\n", incumbent.throughput, local_max.throughput);
+                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                if (file_comparative != nullptr)
+                    fprintf(file_comparative, "%lf %lf\n", elapsed_time, local_max.throughput);
+
+                // printf("melhorei! %lf %lf => %lf\n", elapsed_time, incumbent.throughput,
+                // local_max.throughput);
                 incumbent = explicit_sol;
             }
         }
     }
 
-    double output_value = incumbent.throughput;
-    printf("%.3lf %.3lf\n", old_value, output_value);
+    // double output_value = incumbent.throughput;
+    // printf("%.3lf %.3lf\n", old_value, output_value);
     return incumbent;
 }
 
@@ -209,8 +221,13 @@ int main(int argc, char **argv) {
     freopen(path_input.c_str(), "r", stdin);
     maximumTime = stoi(argv[4]) * 1.0;
     read_data(); // Input will be redirected in the command call
-    Solution aux = vns();
-    
+
+    string objective_improvements = string(argv[3]);
+    objective_improvements += "/objective_improvements" + string(argv[2]);
+    objective_improvements += ".txt";
+
+    Solution aux = vns(objective_improvements);
+
     // print_solution(aux);
     string path_out = string(argv[3]);
     path_out += "/solution" + string(argv[2]);

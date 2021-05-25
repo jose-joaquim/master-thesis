@@ -16,7 +16,6 @@ do
         echo $path_results_final
         mkdir -p ${path_results_final}
         ./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}
-        # ./mdvrbsp_vns ${inst} ${v}
 
         # sol_file="solution.txt"
         # ./check ${inst} ${v} ${sol_file}

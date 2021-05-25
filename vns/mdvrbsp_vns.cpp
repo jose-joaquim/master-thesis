@@ -188,22 +188,23 @@ Solution vns() {
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
+    bool first = true;
     startTime = clock();
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
             delta = local_min;
 
-            if (delta.slots.size() > 0)
+            if (delta.slots.size() > 1)
                 delete_time_slot(delta);
             
             perturbation(delta, k * K_MUL);            // DONE
             compute_violation(delta);
 
-            if (essentiallyEqual(delta.violation, 0)) {
-                puts("hm");
-                return delta;
-            }
+            // if (essentiallyEqual(delta.violation, 0)) {
+            //     puts("hm");
+            //     return delta;
+            // }
             
             Solution multiple = multipleRepresentation(delta); // DONE
             
@@ -218,14 +219,21 @@ Solution vns() {
             compute_violation(delta);    
             delta = convertTo20MhzSol(explicit_sol); // DONE
 
+            if (essentiallyEqual(delta.violation, 0.0)) {
+                puts("hm 2");
+                return delta;
+            }
+
             cout << delta.violation << " " << local_min.violation << endl;
-            if (definitelyLessThan(delta.violation, local_min.violation)) {
+            if (definitelyLessThan(delta.violation, local_min.violation) || first) {
+                first = false;
                 k = 1;
                 local_min = delta;
             } else {
                 k += 1;
             }
-            if (definitelyLessThan(local_min.violation, incumbent.violation)) {
+            if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
+                first = false;
                 printf("melhorei %.3lf %.3lf\n", local_min.violation, incumbent.violation);
                 incumbent = explicit_sol;
             }
@@ -262,6 +270,7 @@ int main(int argc, char **argv) {
     }
 
     maximumTime = stoi(argv[4]) * 1.0;
-    vns();
+    Solution inc = vns();
+    print_solution(inc);
     return 0;
 }
