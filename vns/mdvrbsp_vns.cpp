@@ -158,7 +158,7 @@ void delete_time_slot(Solution &sol) {
     sol.unscheduled = links_id;
 }
 
-Solution vns() {
+Solution vns(string filePrefix) {
     // 1st step: constructive heuristic
     // 2nd step: dp algorithm
     // 3rd step: local search
@@ -167,9 +167,13 @@ Solution vns() {
     //         : 2) local search
     //         : 3) update
 
+    FILE *file_comparative = nullptr;
+    if (!filePrefix.empty())
+        file_comparative = fopen(filePrefix.c_str(), "w");
+
     Solution init_sol = constructive_heuristic(); // TODO (?)
     compute_violation(init_sol);
-    
+
     // if (essentiallyEqual(init_sol.violation, 0.0)) {
     //     puts("opa");
     //     return init_sol;
@@ -183,6 +187,7 @@ Solution vns() {
     // Then, reconstruct optimal local solution
     Solution incumbent = reconstruct_sol(rep); // DONE
     incumbent.throughput = init_sol.throughput;
+    fprintf(file_comparative, "%lf %u %lf\n", 0.0, incumbent.slots.size(), incumbent.violation);
 
     Solution local_min = delta;
 
@@ -197,26 +202,21 @@ Solution vns() {
 
             if (delta.slots.size() > 1)
                 delete_time_slot(delta);
-            
-            perturbation(delta, k * K_MUL);            // DONE
+
+            perturbation(delta, k * K_MUL); // DONE
             compute_violation(delta);
 
-            // if (essentiallyEqual(delta.violation, 0)) {
-            //     puts("hm");
-            //     return delta;
-            // }
-            
             Solution multiple = multipleRepresentation(delta); // DONE
-            
+
             setDP(multiple);
             delta.throughput = calcDP(multiple);
-            
+
             // printf("%lf %lf\n", incumbent.throughput, delta.throughput);
-            
+
             Solution explicit_sol = local_search(multiple, delta); // TODO
             fix_channels(explicit_sol);                            // DONE
 
-            compute_violation(delta);    
+            compute_violation(delta);
             delta = convertTo20MhzSol(explicit_sol); // DONE
 
             if (essentiallyEqual(delta.violation, 0.0)) {
@@ -224,7 +224,7 @@ Solution vns() {
                 return delta;
             }
 
-            cout << delta.violation << " " << local_min.violation << endl;
+            // cout << delta.violation << " " << local_min.violation << endl;
             if (definitelyLessThan(delta.violation, local_min.violation) || first) {
                 first = false;
                 k = 1;
@@ -233,8 +233,12 @@ Solution vns() {
                 k += 1;
             }
             if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
+                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                if (file_comparative != nullptr)
+                    fprintf(file_comparative, "%lf %u %lf\n", elapsed_time, incumbent.slots.size(), local_min.violation);
+                
                 first = false;
-                printf("melhorei %.3lf %.3lf\n", local_min.violation, incumbent.violation);
+                printf("melhorei %lf %.3lf %.3lf\n", elapsed_time, local_min.violation, incumbent.violation);
                 incumbent = explicit_sol;
             }
         }
@@ -258,14 +262,14 @@ int main(int argc, char **argv) {
     path_input += ".txt";
     freopen(path_input.c_str(), "r", stdin);
     read_data();
-    
-    //program_name, instance, version
+
+    // program_name, instance, version
     if (argc == 3) {
         puts("executing only constructive heuristic and printing results...");
         Solution ch = constructive_heuristic();
         FILE *aux = fopen("../gurobi/warm.txt", "w");
         print_solution(ch);
-        print_solution_to_gurobi(ch, aux); 
+        print_solution_to_gurobi(ch, aux);
         return 0;
     }
 
