@@ -1,5 +1,5 @@
 vrbsp:
-	g++ -std=c++11 -o vrbsp_vns vrbsp_vns.cpp
+	g++ -Wall -std=c++11 -g -o vrbsp_vns vrbsp_vns.cpp
 
 mdvrbsp:
 	g++ -D MDVRBSP -std=c++11 mdvrbsp_vns.cpp -o mdvrbsp_vns

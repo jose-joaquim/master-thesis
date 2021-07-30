@@ -37,9 +37,9 @@ static double distanceMatrix[MAX_CONN][MAX_CONN], interferenceMatrix[MAX_CONN][M
 static std::vector<std::vector<double>> dataRates, SINR, beta;
 static std::vector<int> spectrum_size;
 
-static const int MAX_SPECTRUM = 4;
+static const int MAX_SPECTRUM = 5;
 static const int MAX_CHANNELS = 45;
-static const int MAX_SLOTS = 2048; // TODO: This is a high value
+static const int MAX_SLOTS = 250; // TODO: This is a high value
 static double startTime;
 static clock_t maximumTime;
 
@@ -89,7 +89,7 @@ struct Channel {
     bool operator>(const Channel &other) const { return !operator<(other); }
 
     Channel(double throughput, double interference, int bandwidth,
-            const std::vector<Connection> &connections)
+            const std::vector<Connection> connections)
         : throughput(throughput), interference(interference), bandwidth(bandwidth),
           connections(connections) {}
 
@@ -108,7 +108,7 @@ struct Spectrum {
     double interference;
     std::vector<Channel> channels;
 
-    Spectrum(int maxFrequency, int usedFrequency, const std::vector<Channel> &channels)
+    Spectrum(int maxFrequency, int usedFrequency, const std::vector<Channel> channels)
         : maxFrequency(maxFrequency), usedFrequency(usedFrequency), channels(channels) {}
 
     Spectrum() {
@@ -124,7 +124,7 @@ struct TimeSlot {
     double interference;
     double throughput;
 
-    TimeSlot(const std::vector<Spectrum> &sp) : spectrums(sp) {}
+    TimeSlot(const std::vector<Spectrum> sp) : spectrums(sp) {}
     TimeSlot() {
         interference = 0.0;
         throughput = 0.0;
@@ -133,16 +133,15 @@ struct TimeSlot {
 };
 
 class Solution {
-  public:
+public:
     std::vector<TimeSlot> slots;
-    std::vector<int> unscheduled;
     double throughput;
     double violation;
     bool throughput_flag;
 
-    Solution(const std::vector<Spectrum> &sp, double tot, bool flag)
+    Solution(const std::vector<Spectrum> sp, double tot, bool flag)
         : throughput(tot), throughput_flag(flag) {
-        slots.push_back(TimeSlot(sp));
+        slots.emplace_back(sp);
     }
 
     Solution(const vector<TimeSlot> &ts) : slots(ts) {}
@@ -160,6 +159,17 @@ class Solution {
 #endif
 };
 
+void init(void);
+
+Solution vns(void);
+
+Solution vns(string);
+
+Solution constructive_heuristic(void);
+
+bool is_feasible(const Solution &);
+
+
 int bwIdx(int bw) {
     if (bw == 40) {
         return 1;
@@ -172,7 +182,7 @@ int bwIdx(int bw) {
 }
 
 #ifdef MDVRBSP
-double compute_violation(Solution &sol) {
+double computeViolation(Solution &sol) {
     sol.violation = 0.0;
     for (const TimeSlot &ts : sol.slots) {
         for (const Spectrum &sp : ts.spectrums) {
@@ -188,24 +198,20 @@ double compute_violation(Solution &sol) {
 }
 #endif
 
-bool approximatelyEqual(double a, double b, double epsilon = EPS)
-{
-    return fabs(a - b) <= ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+bool approximatelyEqual(double a, double b, double epsilon = EPS) {
+    return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
-bool essentiallyEqual(double a, double b, double epsilon = EPS)
-{
-    return fabs(a - b) <= ( (fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+bool essentiallyEqual(double a, double b, double epsilon = EPS) {
+    return fabs(a - b) <= ((fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
-bool definitelyGreaterThan(double a, double b, double epsilon = EPS)
-{
-    return (a - b) > ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+bool definitelyGreaterThan(double a, double b, double epsilon = EPS) {
+    return (a - b) > ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
-bool definitelyLessThan(double a, double b, double epsilon = EPS)
-{
-    return (b - a) > ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+bool definitelyLessThan(double a, double b, double epsilon = EPS) {
+    return (b - a) > ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
 bool stop(void) { return (((double)(clock() - startTime)) / CLOCKS_PER_SEC) >= maximumTime; }
@@ -410,7 +416,7 @@ void print_objective_to_file(const Solution &sol, FILE *file = nullptr) {
 #else
     fprintf(file, "%lf\n", sol.throughput);
 #endif
-    
+
     fclose(file);
 }
 
@@ -420,16 +426,16 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
     }
 
     fprintf(file, "%d\n", int(sol.slots.size()));
-    
+
     for (const TimeSlot &ts : sol.slots) {
         vector<string> lines;
         for (const Spectrum &sp : ts.spectrums) {
             for (const Channel &ch : sp.channels) {
                 if (ch.connections.empty())
                     continue;
-                
+
                 string line = to_string(ch.bandwidth) + " ";
-                
+
                 for (int i = 0; i < ch.connections.size() - 1; i++) {
                     line += (to_string(ch.connections[i].id) + " ");
                 }
@@ -445,8 +451,6 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
         }
     }
 
-    
-    
     fclose(file);
 }
 
@@ -489,20 +493,17 @@ double computeConnectionThroughput(Connection &conn, int bandwidth, bool force =
         double conn_SINR = (powerSender / pow(conn.distanceSR, alfa)) / (conn.interference + noise);
         conn.SINR = conn_SINR;
 
-        // printf("%lf %.10lf %lf %lf %lf %lf %lf\n", powerSender, conn.distanceSR, alfa, pow(conn.distanceSR, alfa), conn.interference, noise, conn_SINR);
-
         mcs = 11;
-        while (mcs > 0 && conn_SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
+        while (mcs >= 0 && conn_SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
             mcs--;
 
-        // while (mcs + 1 <= maxDataRate && conn_SINR > SINR[mcs + 1][bwIdx(bandwidth)])
-        //     mcs++;
-
-        if (force) {
+        if (force)
             printf("   ->> SINR EH %.10lf, MCS %d, BW %d\n", conn_SINR, mcs, bandwidth);
-        }
 
-        conn.throughput = dataRates[mcs][bwIdx(bandwidth)];
+        if (mcs < 0)
+            conn.throughput = 0.0;
+        else
+            conn.throughput = dataRates[mcs][bwIdx(bandwidth)];
     }
 
     return conn.throughput;
@@ -545,19 +546,22 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
     return newChannel;
 }
 
-bool reinsert(Solution &sol, Connection conn, ti3 to, bool force = false) {
+bool reinsert(Solution &sol, Connection conn, ti3 from, ti3 to, bool force = false) {
     Channel &new_chan = sol.slots[get<0>(to)].spectrums[get<1>(to)].channels[get<2>(to)];
+    Channel &old_chan = sol.slots[get<0>(from)].spectrums[get<1>(from)].channels[get<2>(from)];
+
+    Channel old_new_chan = deleteFromChannel(old_chan, conn.id);
     Channel copy_new_chan = insertInChannel(new_chan, conn.id);
 
-    double newObjective = sol.throughput - new_chan.throughput + copy_new_chan.throughput;
+    double newObjective = sol.throughput - old_chan.throughput + old_new_chan.throughput - new_chan.throughput + copy_new_chan.throughput;
 
     bool improved = false;
     if (newObjective > sol.throughput)
         improved = true;
 
     if ((newObjective > sol.throughput) || force) {
+        old_chan = old_new_chan;
         new_chan = copy_new_chan;
-        //
         sol.throughput = newObjective;
     }
 
@@ -577,11 +581,11 @@ double computeThroughput(Solution &curr, bool force = false) {
                     conn.interference = 0.0;
                     conn.throughput = 0.0;
                     for (Connection &otherConn :
-                         curr.slots[t].spectrums[s].channels[c].connections) {
+                             curr.slots[t].spectrums[s].channels[c].connections) {
                         conn.interference += interferenceMatrix[conn.id][otherConn.id];
                     }
                     chThroughput += computeConnectionThroughput(
-                        conn, curr.slots[t].spectrums[s].channels[c].bandwidth, force);
+                                                                conn, curr.slots[t].spectrums[s].channels[c].bandwidth, force);
                 }
                 OF += chThroughput;
             }
@@ -597,12 +601,14 @@ void print_solution(Solution &sol, bool ok = true) {
     printf("solucao com %lu time-slots e throughput %lf\n", sol.slots.size(), sol.throughput);
     for (int t = 0; t < sol.slots.size(); t++) {
         printf("TS: %d:\n{\n", t);
-        for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
+        for (int s = 0; s < sol.slots[t].spectrums.size() - 1; s++) {
             printf("Spec: %d, ", s);
             for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
-                printf("CH: %d (bw: %d)\nconns:\n", c, sol.slots[t].spectrums[s].channels[c].bandwidth);
+                printf("CH: %d (bw: %d)\nconns:\n", c,
+                       sol.slots[t].spectrums[s].channels[c].bandwidth);
                 for (const Connection &conn : sol.slots[t].spectrums[s].channels[c].connections) {
-                    printf("{%d, %lf, %lf, %lf}\n", conn.id, conn.throughput, conn.interference, conn.SINR);
+                    printf("{%d, %lf, %lf, %lf}\n", conn.id, conn.throughput, conn.interference,
+                           conn.SINR);
                 }
                 puts("");
             }
@@ -610,13 +616,13 @@ void print_solution(Solution &sol, bool ok = true) {
         printf("}\n");
     }
 
-    if (!sol.unscheduled.empty()) {
-        puts("conexoes unscheduled:");
-        for (int id : sol.unscheduled) {
-            printf(" %d", id);
-        }
-        puts("");
+    puts("unscheduled connections:");
+    int spec = sol.slots[0].spectrums.size() - 1;
+    // int chan = sol.slots[0].spectrums[spec].channels.size() - 1;
+    for (const Connection &c : sol.slots[0].spectrums[3].channels[0].connections) {
+        printf(" %d", c.id);
     }
+    puts("");
 }
 
 void recoverSolution(int k, int i, int j, bool clean) {
@@ -657,7 +663,7 @@ Solution reconstruct_sol(const Solution &curr) {
             for (int c = 0; c < MAX_CHANNELS; c++) {
                 if (inSolution[t][s][c]) {
                     ret.slots[t].spectrums[s].channels.emplace_back(
-                        curr.slots[t].spectrums[s].channels[c]);
+                                                                    curr.slots[t].spectrums[s].channels[c]);
                 }
             }
         }
@@ -666,9 +672,18 @@ Solution reconstruct_sol(const Solution &curr) {
     computeThroughput(ret);
 
 #ifdef MDVRBSP
-    compute_violation(ret);
+    computeViolation(ret);
 #endif
     return ret;
+}
+
+double computeObjective(Solution &sol) {
+#ifdef MDVRBSP
+    computeViolation(sol);
+#else
+    computeThroughput(sol);
+#endif
+    return 0;
 }
 
 bool allChannels20MHz(const Solution &sol) {
@@ -686,31 +701,24 @@ bool allChannels20MHz(const Solution &sol) {
 
 bool fix_channels(Solution &sol) {
     bool improved = false;
-    // ti3 zeroChannel = make_tuple(sol.slots.size() - 1, sol.slots[0].spectrums.size() - 1, 0);
+    ti3 zeroChannel = make_tuple(0, 3, 0);
+    // puts("enter do-while");
     do {
         improved = false;
         for (int t = 0; t < sol.slots.size(); t++) {
             for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
                 for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
-                    // if (make_tuple(t, s, c) == zeroChannel)
-                    //     continue;
+                    if (make_tuple(t, s, c) == zeroChannel)
+                        continue;
 
                     int idx = 0;
                     while (idx < sol.slots[t].spectrums[s].channels[c].connections.size()) {
+                        int bandwidth = sol.slots[t].spectrums[s].channels[c].bandwidth;
                         Connection &conn = sol.slots[t].spectrums[s].channels[c].connections[idx];
-                        double aux = computeConnectionThroughput(
-                            conn, sol.slots[t].spectrums[s].channels[c].bandwidth);
+                        double aux = computeConnectionThroughput(conn, bandwidth);
+
                         if (approximatelyEqual(aux, 0.0, EPS)) {
-                            // reinsert(sol, conn, make_tuple(t, s, c), zeroChannel, true);
-                            // Remover link da tupla (t, s, c) e colocar em unscheduled
-                            sol.unscheduled.emplace_back(conn.id);
-
-                            Channel &old_chan = sol.slots[t].spectrums[s].channels[c];
-                            Channel copy_old_channel = deleteFromChannel(old_chan, conn.id);
-
-                            sol.throughput =
-                                sol.throughput - old_chan.throughput + copy_old_channel.throughput;
-                            old_chan = copy_old_channel;
+                            reinsert(sol, conn, make_tuple(t, s, c), zeroChannel, true);
                             improved = true;
                         } else {
                             idx++;
@@ -720,10 +728,11 @@ bool fix_channels(Solution &sol) {
             }
         }
     } while (improved);
+    // puts("leave do-while");
     computeThroughput(sol);
 
 #ifdef MDVRBSP
-    compute_violation(sol);
+    computeViolation(sol);
 #endif
     return improved;
 }
@@ -801,34 +810,32 @@ Solution multipleRepresentation(Solution ret) {
     computeThroughput(ret);
 
 #ifdef MDVRBSP
-    compute_violation(ret);
+    computeViolation(ret);
 #endif
     return ret;
 }
 
 void K_AddDrop(Solution &sol, int K) {
-    K = min(K, int(sol.unscheduled.size()));
+    K = min(K, int(sol.slots[0].spectrums[3].channels[0].connections.size()));
+    ti3 channelFrom = make_tuple(0, 3, 0);
     for (int i = 0; i < K; i++) {
-        int idx = rng.randInt(sol.unscheduled.size() - 1);
+        int idx = rng.randInt(sol.slots[0].spectrums[3].channels[0].connections.size() - 1);
 
-        Connection conn = Connection(sol.unscheduled[idx]);
+        Connection conn = Connection(sol.slots[0].spectrums[3].channels[0].connections[idx]);
 
         int t = rng.randInt(sol.slots.size() - 1);
         int a = rng.randInt(sol.slots[t].spectrums.size() - 1);
         int b = rng.randInt(sol.slots[t].spectrums[a].channels.size() - 1);
         ti3 channelTo = make_tuple(t, a, b);
 
-        reinsert(sol, conn, channelTo, true);
-
-        //Remove connection from the unscheduled vector
-        swap(sol.unscheduled[idx], sol.unscheduled.back());
-        sol.unscheduled.pop_back();
+        reinsert(sol, conn, channelFrom, channelTo, true);
     }
 }
 
-// TODO: finish this code
 void K_RemoveAndInserts(Solution &sol, int K) {
     int k = 0;
+    ti3 channelZero = make_tuple(0, 3, 0);
+    // puts("enter while");
     while (k < K) {
         int t = rng.randInt(sol.slots.size() - 1);
         int a = rng.randInt(sol.slots[t].spectrums.size() - 1);
@@ -843,9 +850,10 @@ void K_RemoveAndInserts(Solution &sol, int K) {
         int z = rng.randInt(ch.connections.size() - 1);
         Connection conn = ch.connections[z];
 
-        ch = deleteFromChannel(ch, conn.id);
-        sol.unscheduled.emplace_back(conn.id);
+        reinsert(sol, conn, make_tuple(t, a, b), channelZero, true);
     }
+
+    // puts("leave");
     K_AddDrop(sol, K);
 }
 
@@ -988,7 +996,6 @@ Solution local_search(Solution &multiple, Solution &curr) {
             }
 
             if (bestOF > curr.throughput) {
-                // printf("entrei %lf %lf\n", bestOF, curr.throughput);
                 improved = true;
 
                 curr.throughput = bestOF;
@@ -1010,7 +1017,7 @@ Solution local_search(Solution &multiple, Solution &curr) {
                     int new_ch = get<2>(best_ch);
                     while (new_ch != -1) {
                         multiple.slots[new_t].spectrums[new_sp].channels[new_ch] = insertInChannel(
-                            multiple.slots[new_t].spectrums[new_sp].channels[new_ch], i);
+                                                                                                   multiple.slots[new_t].spectrums[new_sp].channels[new_ch], i);
                         new_ch = parent[new_t][new_sp][new_ch];
                     }
                 }
@@ -1019,8 +1026,7 @@ Solution local_search(Solution &multiple, Solution &curr) {
 
     } while (improved);
 
-    Solution to_ret = reconstruct_sol(multiple);
-    return to_ret;
+    return reconstruct_sol(multiple);
 }
 
 void computeChannelsThroughput(vector<Channel> &channels) {
@@ -1035,7 +1041,7 @@ void computeChannelsThroughput(vector<Channel> &channels) {
 
 void rawInsert(Solution &sol, int conn, ti3 to) {
     sol.slots[get<0>(to)].spectrums[get<1>(to)].channels[get<2>(to)].connections.emplace_back(
-        Connection(conn));
+                                                                                              Connection(conn));
 }
 
 vector<Channel> split(Channel toSplit) {
@@ -1047,7 +1053,7 @@ vector<Channel> split(Channel toSplit) {
     vector<Connection> connToInsert = toSplit.connections;
     sort(connToInsert.rbegin(), connToInsert.rend());
 
-    double bestThroughputSoFar = 0.0;
+    double bestThroughputsoFar = 0.0;
     for (int i = 0; i < connToInsert.size(); i++) {
         double bestThroughputIteration = 0.0, testando = 0.0;
         Channel bestChannel(0.0, 0.0, newBw, vector<Connection>());
@@ -1057,11 +1063,11 @@ vector<Channel> split(Channel toSplit) {
             Channel inserted = insertInChannel(ret[c], connToInsert[i].id);
             double resultThroughput = inserted.throughput;
 
-            double g_throughput = (bestThroughputSoFar - ret[c].throughput) + resultThroughput;
+            double g_throughput = (bestThroughputsoFar - ret[c].throughput) + resultThroughput;
             testando = max(testando, g_throughput);
             bool one = g_throughput > bestThroughputIteration;
             bool two = approximatelyEqual(g_throughput, bestThroughputIteration) &&
-                       (inserted.connections.size() < bestChannel.connections.size());
+                (inserted.connections.size() < bestChannel.connections.size());
 
             if (one || two) {
                 bestThroughputIteration = g_throughput;
@@ -1072,10 +1078,10 @@ vector<Channel> split(Channel toSplit) {
 
         assert(bestIdx >= 0);
         ret[bestIdx] = bestChannel;
-        bestThroughputSoFar = bestThroughputIteration;
+        bestThroughputsoFar = bestThroughputIteration;
     }
     computeChannelsThroughput(ret);
-    assert(approximatelyEqual(ret[0].throughput + ret[1].throughput, bestThroughputSoFar));
+    assert(approximatelyEqual(ret[0].throughput + ret[1].throughput, bestThroughputsoFar));
     return ret;
 }
 
@@ -1102,7 +1108,7 @@ void remove_timeslot(Solution &curr) {
             for (const Connection &conn : ch.connections) {
                 int n_ts = rng.randInt(curr.slots.size());
                 int n_sp = rng.randInt(curr.slots[n_ts].spectrums.size());
-                int n_ch = rng.randInt(curr.slots[n_ts].spectrums[n_ch].channels.size());
+                int n_ch = rng.randInt(curr.slots[n_ts].spectrums[n_sp].channels.size());
                 // inserir conexao no local sorteado e re-computar throughput de todo mundo
                 insertConnectionAt(n_ts, n_sp, n_ch, conn.id, curr);
             }
@@ -1121,14 +1127,113 @@ inline void perturbation(Solution &sol, int kkmul) {
     fix_channels(sol);
 }
 
-void init(void);
+int compareObjectives(const Solution &lhs, const Solution &rhs) {
+#ifdef MDVRBSP
+    if (definitelyLessThan(lhs.violation, rhs.violation)) {
+        return 1;
+    }
 
-Solution vns(void);
+    return essentiallyEqual(lhs.violation, rhs.violation) ? 0 : -1;
+#else
+    if (definitelyGreaterThan(lhs.throughput, rhs.throughput)) {
+        return 1;
+    }
 
-Solution vns(string);
+    return essentiallyEqual(lhs.throughput, rhs.throughput) ? 0 : -1;
+#endif
+}
 
-Solution constructive_heuristic(void);
+Solution vns(string filePrefix) {
+    // 1st step: constructive heuristic
+    // 2nd step: dp algorithm
+    // 3rd step: local search
+    // 4th step: main loop until stopping condition
+    //         : 1) perturbation
+    //         : 2) local search
+    //         : 3) update
 
-bool is_feasible(const Solution &);
+    // ~~~~~~~~~~~~~~~~~~~~~~~`
+    // ===============>> O THROUGHPUT DE UMA SOLUCAO EH O RETORNADO PELA DP!!!
+    // ~~~~~~~~~~~~~~~~~~~~~~~`
+
+    FILE *file_comparative = nullptr;
+    if (!filePrefix.empty())
+        file_comparative = fopen(filePrefix.c_str(), "w");
+
+    Solution init_sol = constructive_heuristic(); // TODO (?)
+    Solution delta = convertTo20MhzSol(init_sol); // DONE
+
+    Solution rep = multipleRepresentation(delta); // DONE
+    setDP(rep);
+    double retOF = calcDP(rep);
+
+    // Then, reconstruct optimal local solution
+    Solution incumbent = reconstruct_sol(rep); // DONE
+    incumbent.throughput = init_sol.throughput;
+
+    Solution local_max = incumbent;
+    double old_value = incumbent.throughput;
+    fprintf(file_comparative, "%lf %lf\n", 0.0, old_value);
+
+    int K_MUL = max(1, n_connections / 100);
+    int K_MAX = 10;
+    startTime = clock();
+    while (!stop()) {
+        int k = 1;
+        while (!stop() && k <= K_MAX) {
+            delta = local_max;
+            perturbation(delta, k * K_MUL);                    // DONE
+
+            Solution multiple = multipleRepresentation(delta); // DONE
+            setDP(multiple);
+            delta.throughput = calcDP(multiple);
+
+            Solution explicit_sol = local_search(multiple, delta); // TODO
+            fix_channels(explicit_sol);                            // DONE
+             
+            delta = convertTo20MhzSol(explicit_sol); // DONE
+            // assert(essentiallyEqual(explicit_sol.throughput, delta.throughput));
+
+            if (compareObjectives(delta, local_max) == 1) {
+                // printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+                k = 1;
+                local_max = delta;
+            } else
+                k += 1;
+
+            if (compareObjectives(local_max, incumbent)) {
+                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                if (file_comparative != nullptr)
+                    fprintf(file_comparative, "%lf %lf\n", elapsed_time, local_max.throughput);
+            
+                printf("melhorei! %lf %lf => %lf\n", elapsed_time, incumbent.throughput,
+                       local_max.throughput);
+                incumbent = explicit_sol;
+            }
+            
+            // if (definitelyGreaterThan(delta.throughput, local_max.throughput)) {
+            //     // printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+            //     k = 1;
+            //     local_max = delta;
+            // } else {
+            //     k += 1;
+            // }
+            
+            // if (definitelyGreaterThan(local_max.throughput, incumbent.throughput)) {
+            //     double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+            //     if (file_comparative != nullptr)
+            //         fprintf(file_comparative, "%lf %lf\n", elapsed_time, local_max.throughput);
+            // 
+            //     printf("melhorei! %lf %lf => %lf\n", elapsed_time, incumbent.throughput,
+            //            local_max.throughput);
+            //     incumbent = explicit_sol;
+            // }
+        }
+    }
+
+    double output_value = incumbent.throughput;
+    printf("%.3lf %.3lf\n", old_value, output_value);
+    return incumbent;
+}
 
 #endif
