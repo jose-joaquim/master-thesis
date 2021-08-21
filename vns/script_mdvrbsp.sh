@@ -15,6 +15,7 @@ do
         path_results_final=${path_results}${inst};
         echo $path_results_final
         mkdir -p ${path_results_final}
+        echo "./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}"
         ./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}
 
         # sol_file="solution.txt"

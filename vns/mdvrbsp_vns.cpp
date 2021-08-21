@@ -1,3 +1,4 @@
+//run 16 1 results/vns-vrbsp/U_16 10
 #include "VNS.h"
 
 bool is_feasible(const Solution &ret) {
@@ -17,7 +18,6 @@ bool is_feasible(const Solution &ret) {
         }
     }
 
-    // printf("%d %d\n", cnt, n_connections);
     return cnt == n_connections;
 }
 
@@ -141,24 +141,28 @@ Solution constructive_heuristic() {
     return ret;
 }
 
-void delete_time_slot(Solution &sol) {
-    int to_del = rng.randInt(sol.slots.size() - 1);
-    vector<int> links_id;
-    for (const Spectrum &sp : sol.slots[to_del].spectrums) {
+Solution delete_time_slot(const Solution &sol) {
+    Solution ret = Solution(sol);
+    
+    int to_del = rng.randInt(ret.slots.size() - 1);
+    vector<Connection> links;
+    for (const Spectrum &sp : ret.slots[to_del].spectrums) {
         for (const Channel &ch : sp.channels) {
             for (const Connection &conn : ch.connections) {
-                links_id.push_back(conn.id);
+                links.emplace_back(conn.id);
             }
         }
     }
 
-    swap(sol.slots[to_del], sol.slots.back());
-    sol.slots.pop_back();
-
-    sol.unscheduled = links_id;
+    swap(ret.slots[to_del], ret.slots.back());
+    ret.slots.pop_back();
+    ret.slots[0].spectrums[3].channels[0].connections = links;
+    K_AddDrop(ret, links.size());
+    computeViolation(ret);
+    return ret;
 }
 
-Solution vns(string filePrefix) {
+Solution vns(Solution initial, string filePrefix) {
     // 1st step: constructive heuristic
     // 2nd step: dp algorithm
     // 3rd step: local search
@@ -171,23 +175,17 @@ Solution vns(string filePrefix) {
     if (!filePrefix.empty())
         file_comparative = fopen(filePrefix.c_str(), "w");
 
-    Solution init_sol = constructive_heuristic(); // TODO (?)
-    compute_violation(init_sol);
-
-    // if (essentiallyEqual(init_sol.violation, 0.0)) {
-    //     puts("opa");
-    //     return init_sol;
-    // }
-
-    Solution delta = convertTo20MhzSol(init_sol); // DONE
-    Solution rep = multipleRepresentation(delta); // DONE
+    Solution delta = convertTo20MhzSol(initial); 
+    Solution rep = multipleRepresentation(delta); 
     setDP(rep);
     double retOF = calcDP(rep);
 
     // Then, reconstruct optimal local solution
-    Solution incumbent = reconstruct_sol(rep); // DONE
-    incumbent.throughput = init_sol.throughput;
-    fprintf(file_comparative, "%lf %u %lf\n", 0.0, incumbent.slots.size(), incumbent.violation);
+    Solution incumbent = reconstruct_sol(rep);
+    incumbent.throughput = initial.throughput;
+
+    if (file_comparative != nullptr)
+        fprintf(file_comparative, "%lf %lu %lf\n", 0.0, incumbent.slots.size(), incumbent.violation);
 
     Solution local_min = delta;
 
@@ -199,32 +197,25 @@ Solution vns(string filePrefix) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
             delta = local_min;
+            
+            perturbation(delta, k * K_MUL);
+            computeViolation(delta);
 
-            if (delta.slots.size() > 1)
-                delete_time_slot(delta);
-
-            perturbation(delta, k * K_MUL); // DONE
-            compute_violation(delta);
-
-            Solution multiple = multipleRepresentation(delta); // DONE
+            Solution multiple = multipleRepresentation(delta);
 
             setDP(multiple);
             delta.throughput = calcDP(multiple);
 
-            // printf("%lf %lf\n", incumbent.throughput, delta.throughput);
+            Solution explicit_sol = local_search(multiple, delta); 
+            fix_channels(explicit_sol);                            
 
-            Solution explicit_sol = local_search(multiple, delta); // TODO
-            fix_channels(explicit_sol);                            // DONE
+            computeViolation(delta);
+            delta = convertTo20MhzSol(explicit_sol);
 
-            compute_violation(delta);
-            delta = convertTo20MhzSol(explicit_sol); // DONE
+            if (essentiallyEqual(delta.violation, 0.0))
+                // Found the best solution
+                return reconstruct_sol(delta);
 
-            if (essentiallyEqual(delta.violation, 0.0)) {
-                puts("hm 2");
-                return delta;
-            }
-
-            // cout << delta.violation << " " << local_min.violation << endl;
             if (definitelyLessThan(delta.violation, local_min.violation) || first) {
                 first = false;
                 k = 1;
@@ -232,10 +223,11 @@ Solution vns(string filePrefix) {
             } else {
                 k += 1;
             }
+            
             if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
                 double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
                 if (file_comparative != nullptr)
-                    fprintf(file_comparative, "%lf %u %lf\n", elapsed_time, incumbent.slots.size(), local_min.violation);
+                    fprintf(file_comparative, "%lf %lu %lf\n", elapsed_time, incumbent.slots.size(), local_min.violation);
                 
                 first = false;
                 printf("melhorei %lf %.3lf %.3lf\n", elapsed_time, local_min.violation, incumbent.violation);
@@ -245,6 +237,22 @@ Solution vns(string filePrefix) {
     }
 
     return incumbent;
+}
+
+Solution reductionHeuristic() {
+    Solution S_star = constructive_heuristic();
+
+    while (not stop()) {
+        Solution S1 = delete_time_slot(S_star);
+        puts("enter vns...");
+        S1 = vns(S1, string());
+
+        puts("leaving vns...");
+        if (yFeasible(S1))
+            S_star = S1;
+    }
+
+    return S_star;
 }
 
 int main(int argc, char **argv) {
@@ -274,7 +282,7 @@ int main(int argc, char **argv) {
     }
 
     maximumTime = stoi(argv[4]) * 1.0;
-    Solution inc = vns();
+    Solution inc = reductionHeuristic();
     print_solution(inc);
     return 0;
 }
