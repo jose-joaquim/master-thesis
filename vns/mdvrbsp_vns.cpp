@@ -1,16 +1,20 @@
-//run 16 1 results/vns-vrbsp/U_16 10
+// run 16 1 results/vns-vrbsp/U_16 10
+// URGENTE: verificar se quando o canal eh inviavel se todas as conexoes tem throughput setado para
+// 0!!!!
 #include "VNS.h"
 
-bool is_feasible(const Solution &ret) {
+bool is_feasible(const Solution &ret, bool retOption = true) {
     int cnt = 0;
+    set<int> scheduled;
     for (const TimeSlot &ts : ret.slots) {
         for (const Spectrum &sp : ts.spectrums) {
             for (const Channel &ch : sp.channels) {
                 for (const Connection &conn : ch.connections) {
                     // printf("conn %d\n", conn.id);
                     cnt += 1;
+                    scheduled.insert(conn.id);
                     if (conn.throughput < gma[conn.id]) {
-                        printf("%lf %lf\n", conn.throughput, gma[conn.id]);
+                        printf("ops... conn %d %lf %lf\n", conn.id, conn.throughput, gma[conn.id]);
                         return false;
                     }
                 }
@@ -18,7 +22,17 @@ bool is_feasible(const Solution &ret) {
         }
     }
 
-    return cnt == n_connections;
+    if (cnt != n_connections) {
+        for (auto x : scheduled)
+            printf("%d ", x);
+
+        puts("");
+    }
+
+    if (retOption)
+        return cnt == n_connections;
+
+    return cnt >= n_connections;
 }
 
 bool can_split(const Channel &ch) {
@@ -143,13 +157,17 @@ Solution constructive_heuristic() {
 
 Solution delete_time_slot(const Solution &sol) {
     Solution ret = Solution(sol);
-    
+
     int to_del = rng.randInt(ret.slots.size() - 1);
     vector<Connection> links;
     for (const Spectrum &sp : ret.slots[to_del].spectrums) {
         for (const Channel &ch : sp.channels) {
             for (const Connection &conn : ch.connections) {
-                links.emplace_back(conn.id);
+                Connection aux(conn);
+                aux.throughput = 0.0;
+                aux.interference = 0.0;
+                aux.SINR = 0.0;
+                links.emplace_back(aux);
             }
         }
     }
@@ -175,8 +193,10 @@ Solution vns(Solution initial, string filePrefix) {
     if (!filePrefix.empty())
         file_comparative = fopen(filePrefix.c_str(), "w");
 
-    Solution delta = convertTo20MhzSol(initial); 
-    Solution rep = multipleRepresentation(delta); 
+    count_conn(initial);
+    Solution delta = convertTo20MhzSol(initial);
+    count_conn(delta);
+    Solution rep = multipleRepresentation(delta);
     setDP(rep);
     double retOF = calcDP(rep);
 
@@ -185,10 +205,12 @@ Solution vns(Solution initial, string filePrefix) {
     incumbent.throughput = initial.throughput;
 
     if (file_comparative != nullptr)
-        fprintf(file_comparative, "%lf %lu %lf\n", 0.0, incumbent.slots.size(), incumbent.violation);
+        fprintf(file_comparative, "%lf %lu %lf\n", 0.0, incumbent.slots.size(),
+                incumbent.violation);
 
     Solution local_min = delta;
-
+    count_conn(local_min);
+    
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
     bool first = true;
@@ -196,60 +218,90 @@ Solution vns(Solution initial, string filePrefix) {
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
+            puts("begin");
+            
             delta = local_min;
-            
+
+            count_conn(delta);
             perturbation(delta, k * K_MUL);
+
+            count_conn(delta);
             computeViolation(delta);
 
-            Solution multiple = multipleRepresentation(delta);
-
-            setDP(multiple);
-            delta.throughput = calcDP(multiple);
-
-            Solution explicit_sol = local_search(multiple, delta); 
-            fix_channels(explicit_sol);                            
-
-            computeViolation(delta);
-            delta = convertTo20MhzSol(explicit_sol);
-
-            if (essentiallyEqual(delta.violation, 0.0))
-                // Found the best solution
-                return reconstruct_sol(delta);
-
-            if (definitelyLessThan(delta.violation, local_min.violation) || first) {
-                first = false;
-                k = 1;
-                local_min = delta;
-            } else {
-                k += 1;
-            }
-            
-            if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
-                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-                if (file_comparative != nullptr)
-                    fprintf(file_comparative, "%lf %lu %lf\n", elapsed_time, incumbent.slots.size(), local_min.violation);
-                
-                first = false;
-                printf("melhorei %lf %.3lf %.3lf\n", elapsed_time, local_min.violation, incumbent.violation);
-                incumbent = explicit_sol;
-            }
+            // Solution multiple = multipleRepresentation(delta);
+            // 
+            // count_conn(multiple, true);
+            // setDP(multiple);
+            // delta.violation = calcDP(multiple);
+            // 
+            // Solution explicit_sol = local_search(multiple, delta);
+            // count_conn(explicit_sol);
+            // 
+            // if (essentiallyEqual(explicit_sol.violation, 0.0)) {
+            //     printf("found solution with violation 0.0!\n");
+            //     return explicit_sol;
+            // }
+            // 
+            // fix_channels(explicit_sol);
+            // 
+            // computeViolation(delta);
+            // delta = convertTo20MhzSol(explicit_sol);
+            // count_conn(delta);
+            // 
+            // if (definitelyLessThan(delta.violation, local_min.violation) || first) {
+            //     first = false;
+            //     k = 1;
+            //     local_min = delta;
+            // } else {
+            //     k += 1;
+            // }
+            // 
+            // if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
+            //     double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+            //     if (file_comparative != nullptr)
+            //         fprintf(file_comparative, "%lf %lu %lf\n", elapsed_time, incumbent.slots.size(), local_min.violation);
+            // 
+            //     // assert(is_feasible(explicit_sol));
+            //     first = false;
+            //     printf("melhorei %lf %.3lf %.3lf\n", elapsed_time, local_min.violation,
+            //            incumbent.violation);
+            //     incumbent = explicit_sol;
+            // }
+            // 
+            // count_conn(local_min);
+            // count_conn(delta);
+            // count_conn(explicit_sol);
+            // count_conn(incumbent);
+            // // puts("end iteration");
         }
     }
+
+    count_conn(incumbent);
 
     return incumbent;
 }
 
 Solution reductionHeuristic() {
     Solution S_star = constructive_heuristic();
-
+    printf("initial solution has %lu time-slots\n", S_star.slots.size());
     while (not stop()) {
         Solution S1 = delete_time_slot(S_star);
-        puts("enter vns...");
+
+        int cnt = 1;
+        while (yFeasible(S1) && ++cnt)
+            S1 = delete_time_slot(S1);
+        
+        printf("removed %d time-slots. Violation is now %lf\n", cnt, S1.violation);
+
         S1 = vns(S1, string());
 
         puts("leaving vns...");
-        if (yFeasible(S1))
+        if (yFeasible(S1)) {
+            printf("found feasible solution with violation %lf and %lu time-slots\n", S1.violation,
+                   S1.slots.size());
+            assert(is_feasible(S1));
             S_star = S1;
+        }
     }
 
     return S_star;
