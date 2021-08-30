@@ -354,9 +354,9 @@ void initTimeSlot() {
         assert(sp.maxFrequency - sp.usedFrequency >= 0);
     }
 
-    vector<Channel> aux;
-    aux.emplace_back(Channel());
-    init_conf.emplace_back(0, 0, aux);
+    // vector<Channel> aux;
+    // aux.emplace_back(Channel());
+    // init_conf.emplace_back(0, 0, aux);
 }
 
 void read_data() {
@@ -687,6 +687,11 @@ void recoverSolution(int k, int i, int j, bool clean) {
 int count_conn(const Solution &sol, bool op = false) {
     int ret = 0;
 #ifdef MDVRBSP
+    if (!sol.slots[0].spectrums[3].channels[0].connections.empty())
+        for (auto &c : sol.slots[0].spectrums[3].channels[0].connections)
+            printf("%d ", c.id);
+    puts("");
+
     assert(sol.slots[0].spectrums[3].channels[0].connections.empty());
 #endif
 
@@ -703,12 +708,12 @@ int count_conn(const Solution &sol, bool op = false) {
         for (auto &x : sol.slots)
             for (auto &y : x.spectrums)
                 for (auto &z : y.channels)
-                    for (auto &c : z.connections)
-                        printf(" %d", c.id);
+                    if (z.bandwidth != 0)
+                        for (auto &c : z.connections)
+                            printf(" %d", c.id);
 
         puts("");
-
-        assert(ret == n_connections);
+        assert(fail);
     }
     return ret;
 }
@@ -895,7 +900,6 @@ Solution multipleRepresentation(Solution ret) {
 }
 
 void K_AddDrop(Solution &sol, int K) {
-    int aux1 = K, aux2 = sol.slots[0].spectrums[3].channels[0].connections.size();
     K = min(K, int(sol.slots[0].spectrums[3].channels[0].connections.size()));
     ti3 channelFrom = make_tuple(0, 3, 0);
     vector<int> inserted, sizes;
@@ -909,11 +913,17 @@ void K_AddDrop(Solution &sol, int K) {
         int b = rng.randInt(sol.slots[t].spectrums[a].channels.size() - 1);
         ti3 channelTo = make_tuple(t, a, b);
 
-        sizes.emplace_back(sol.slots[0].spectrums[3].channels[0].connections.size());
+#ifdef MDVRBSP
+        if (channelTo == channelFrom) {
+            i--;
+            continue;
+        }
+#endif
+
         reinsert(sol, conn, channelFrom, channelTo, true);
-        sizes.emplace_back(sol.slots[0].spectrums[3].channels[0].connections.size());
-        inserted.emplace_back(idx);
     }
+
+    count_conn(sol);
 }
 
 void K_RemoveAndInserts(Solution &sol, int K) {
@@ -940,15 +950,8 @@ void K_RemoveAndInserts(Solution &sol, int K) {
         int z = rng.randInt(ch.connections.size() - 1);
         Connection conn = ch.connections[z];
 
-        // checkRepeat(sol.slots[0].spectrums[3].channels[0]);
         reinsert(sol, conn, make_tuple(t, a, b), channelZero, true);
-        // checkRepeat(sol.slots[0].spectrums[3].channels[0]);
     }
-
-    // assert(is_feasible(sol, false));
-
-    // if (sol.slots[0].spectrums[3].channels[0].connections.empty())
-    //     puts("eita");
 
     K_AddDrop(sol, K);
 }
@@ -1078,8 +1081,10 @@ inline void removeAllOccurrences(Solution &sol, int id) {
         for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
             for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
 #ifdef MDVRBSP
-                if (make_tuple(t, s, c) == zeroChannel)
+                if (make_tuple(t, s, c) == zeroChannel) {
+                    assert(sol.slots[t].spectrums[s].channels[c].connections.empty());
                     continue;
+                }
 #endif
 
                 Channel &chan = sol.slots[t].spectrums[s].channels[c];
@@ -1116,6 +1121,9 @@ Solution local_search(Solution &multiple, Solution &curr) {
     bool improved = false;
 
     // TODO: os for-loops devem ser com indexes mesmo. Remover da busca zeroChannel com MDVRBSP
+
+    count_conn(multiple, true);
+    count_conn(curr);
     ti3 zeroChannel = make_tuple(0, 3, 0);
     do {
         improved = false;
@@ -1311,10 +1319,7 @@ inline void perturbation(Solution &sol, int kkmul) {
         K_RemoveAndInserts(sol, kkmul);
     }
 #else
-    // assert(is_feasible(sol, false));
     K_RemoveAndInserts(sol, kkmul);
-
-    // assert(is_feasible(sol, false));
 #endif
 
     fix_channels(sol);
