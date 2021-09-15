@@ -309,7 +309,7 @@ def modelF1_v2(
 
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
-        model.setParam("LogToConsole", 0)
+        # model.setParam("LogToConsole", 0)
         model.setParam("TimeLimit", 3600)
         model.setParam("IntFeasTol", 1e-7)
         model.optimize()

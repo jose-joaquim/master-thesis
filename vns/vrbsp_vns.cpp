@@ -1,3 +1,4 @@
+// run 128 1 results/vns-vrbsp/U_128 10
 #include "VNS.h"
 
 using namespace std;
@@ -16,7 +17,7 @@ Solution constructive_heuristic() {
     for (int conn : links) {
         double bestThroughputIteration = bestThroughputSoFar;
         vector<Channel> bestSplitChannels;
-        Channel bestChannel(0.0, 0.0, 0, vector<Connection>());
+        Channel bestChannel(0.0, 0.0, 0, 0, vector<Connection>());
         ii where = {-1, -1};
         bool isSplit = false, inserted = false;
         int bestBandwidthSplit = -1, bandwidthSplit = -1;
@@ -90,7 +91,6 @@ Solution constructive_heuristic() {
             }
         }
 
-        double aux = bestThroughputSoFar;
         bestThroughputSoFar = bestThroughputIteration;
 
         if (inserted) {
@@ -121,13 +121,88 @@ Solution constructive_heuristic() {
     for (int c : zeroConn)
         zeroConnections.emplace_back(Connection(c));
 
-    Channel zeroChannel(0, 0, 0, zeroConnections);
+    Channel zeroChannel(0, 0, 0, 0, zeroConnections);
     vector<Channel> auxVector{zeroChannel};
     retCopy.slots[0].spectrums.emplace_back(0, 0, auxVector);
 
     ret = retCopy;
     return ret;
 }
+
+Solution vns(string filePrefix) {
+    // 1st step: constructive heuristic
+    // 2nd step: dp algorithm
+    // 3rd step: local search
+    // 4th step: main loop until stopping condition
+    //         : 1) perturbation
+    //         : 2) local search
+    //         : 3) update
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~`
+    // ===============>> O THROUGHPUT DE UMA SOLUCAO EH O RETORNADO PELA DP!!!
+    // ~~~~~~~~~~~~~~~~~~~~~~~`
+
+    FILE *file_comparative = nullptr;
+    if (!filePrefix.empty())
+        file_comparative = fopen(filePrefix.c_str(), "w");
+
+    Solution init_sol = constructive_heuristic(); // TODO (?)
+    Solution delta = convertTo20MhzSol(init_sol); // DONE
+
+    Solution rep = multipleRepresentation(delta); // DONE
+    setDP(rep);
+    double retOF = calcDP(rep);
+    
+    // Then, reconstruct optimal local solution
+    Solution incumbent = reconstruct_sol(rep); // DONE
+    incumbent.throughput = init_sol.throughput;
+
+    Solution local_max = incumbent;
+    double old_value = incumbent.throughput;
+    fprintf(file_comparative, "%lf %lf\n", 0.0, old_value);
+
+    int K_MUL = max(1, n_connections / 100);
+    int K_MAX = 10;
+    startTime = clock();
+    while (!stop()) {
+        int k = 1;
+        while (!stop() && k <= K_MAX) {
+            delta = local_max;
+            perturbation(delta, k * K_MUL); // DONE
+
+            Solution multiple = multipleRepresentation(delta); // DONE
+            setDP(multiple);
+            delta.throughput = calcDP(multiple);
+
+            Solution explicit_sol = local_search(multiple, delta); // TODO
+            fix_channels(explicit_sol);                            // DONE
+
+            delta = convertTo20MhzSol(explicit_sol); // DONE
+
+            if (compareObjectives(delta, local_max) < 0) {
+                // printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+                k = 1;
+                local_max = delta;
+            } else
+                k += 1;
+
+            if (compareObjectives(local_max, incumbent) < 0) {
+                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                if (file_comparative != nullptr)
+                    fprintf(file_comparative, "%lf %lf\n", elapsed_time, local_max.throughput);
+
+                printf("melhorei! %lf %lf => %lf\n", elapsed_time, incumbent.throughput,
+                       local_max.throughput);
+                incumbent = explicit_sol;
+            }
+        }
+    }
+
+    double output_value = incumbent.throughput;
+    printf("%.3lf %.3lf\n", old_value, output_value);
+    return incumbent;
+}
+
 
 int main(int argc, char **argv) {
     if (argc != 5) {
