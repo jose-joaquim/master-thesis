@@ -57,7 +57,7 @@ Solution constructive_heuristic() {
                 if (!channelSplit.empty()) {
                     ammount = max(channelSplit[0].throughput + channelSplit[1].throughput, ammount);
                     betterSplit = (channelSplit[0].throughput + channelSplit[1].throughput) >
-                        channelInserted.throughput;
+                                  channelInserted.throughput;
                 }
 
                 bandwidthSplit =
@@ -96,10 +96,10 @@ Solution constructive_heuristic() {
         if (inserted) {
             if (isSplit) {
                 retCopy.slots[0].spectrums[where.first].channels.erase(
-                                                                       retCopy.slots[0].spectrums[where.first].channels.begin() + where.second);
+                    retCopy.slots[0].spectrums[where.first].channels.begin() + where.second);
                 retCopy.slots[0].spectrums[where.first].channels.insert(
-                                                                        retCopy.slots[0].spectrums[where.first].channels.begin() + where.second,
-                                                                        bestSplitChannels.begin(), bestSplitChannels.end());
+                    retCopy.slots[0].spectrums[where.first].channels.begin() + where.second,
+                    bestSplitChannels.begin(), bestSplitChannels.end());
             } else {
                 retCopy.slots[0].spectrums[where.first].channels[where.second] = bestChannel;
             }
@@ -142,31 +142,34 @@ Solution vns(string filePrefix) {
     // ===============>> O THROUGHPUT DE UMA SOLUCAO EH O RETORNADO PELA DP!!!
     // ~~~~~~~~~~~~~~~~~~~~~~~`
 
-    FILE *file_comparative = nullptr;
+    FILE *outFile = nullptr;
     if (!filePrefix.empty())
-        file_comparative = fopen(filePrefix.c_str(), "w");
+        outFile = fopen(filePrefix.c_str(), "w");
 
     Solution init_sol = constructive_heuristic(); // TODO (?)
+    // count_conn(init_sol);
     Solution delta = convertTo20MhzSol(init_sol); // DONE
 
     Solution rep = multipleRepresentation(delta); // DONE
     setDP(rep);
     double retOF = calcDP(rep);
-    
+
     // Then, reconstruct optimal local solution
     Solution incumbent = reconstruct_sol(rep); // DONE
     incumbent.throughput = init_sol.throughput;
 
     Solution local_max = incumbent;
     double old_value = incumbent.throughput;
-    fprintf(file_comparative, "%lf %lf\n", 0.0, old_value);
+    fprintf(outFile, "%.3lf %lf\n", 0.0, old_value);
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
+    double currTime = 0.0;
     startTime = clock();
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
+            // puts("begin");
             delta = local_max;
             perturbation(delta, k * K_MUL); // DONE
 
@@ -180,29 +183,28 @@ Solution vns(string filePrefix) {
             delta = convertTo20MhzSol(explicit_sol); // DONE
 
             if (compareObjectives(delta, local_max) < 0) {
-                // printf("delta better %lf => %lf\n", local_max.throughput, delta.throughput);
+                // printf("%lf %lf\n", local_max.throughput, delta.throughput);
                 k = 1;
                 local_max = delta;
             } else
                 k += 1;
 
             if (compareObjectives(local_max, incumbent) < 0) {
-                double elapsed_time = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-                if (file_comparative != nullptr)
-                    fprintf(file_comparative, "%lf %lf\n", elapsed_time, local_max.throughput);
+                currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                if (outFile != nullptr)
+                    fprintf(outFile, "%.3lf %.3lf\n", currTime, local_max.throughput);
 
-                printf("melhorei! %lf %lf => %lf\n", elapsed_time, incumbent.throughput,
-                       local_max.throughput);
+                printf("%lf %lf %lf\n", currTime, incumbent.throughput, local_max.throughput);
                 incumbent = explicit_sol;
             }
         }
     }
 
     double output_value = incumbent.throughput;
-    printf("%.3lf %.3lf\n", old_value, output_value);
+    currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+    printf("%.3lf %.3lf %.3lf\n", currTime, old_value, output_value);
     return incumbent;
 }
-
 
 int main(int argc, char **argv) {
     if (argc != 5) {
@@ -228,7 +230,6 @@ int main(int argc, char **argv) {
 
     Solution aux = vns(objective_improvements);
 
-    // print_solution(aux);
     string path_out = string(argv[3]);
     path_out += "/solution" + string(argv[2]);
     path_out += ".txt";
@@ -236,10 +237,10 @@ int main(int argc, char **argv) {
     FILE *file_out = fopen(path_out.c_str(), "w");
     print_solution_to_file(aux, file_out);
 
-    string path_obj = string(argv[3]);
-    path_obj += "/objectives.txt";
-    cout << path_obj << endl;
-    FILE *file_obj = fopen(path_obj.c_str(), "a");
-    print_objective_to_file(aux, file_obj);
+    // string path_obj = string(argv[3]);
+    // path_obj += "/objectivesxo.txt";
+    // cout << path_obj << endl;
+    // FILE *file_obj = fopen(path_obj.c_str(), "a");
+    // print_objective_to_file(aux, file_obj);
     return 0;
 }

@@ -703,19 +703,28 @@ int count_conn(const Solution &sol, bool op = false) {
     for (auto &x : sol.slots)
         for (auto &y : x.spectrums)
             for (auto &z : y.channels)
-                if (z.bandwidth != 0)
-                    ret += z.connections.size();
+                // if (z.bandwidth != 0)
+                ret += z.connections.size();
 
-    bool fail = op ? ret <= n_connections : ret != n_connections;
+    bool fail = op ? ret < n_connections : ret != n_connections;
     if (fail) {
         printf(" vixe %d %d\n", ret, n_connections);
 
+        set<int> ids;
         for (auto &x : sol.slots)
             for (auto &y : x.spectrums)
                 for (auto &z : y.channels)
-                    if (z.bandwidth != 0)
-                        for (auto &c : z.connections)
-                            printf(" %d", c.id);
+                    // if (z.bandwidth != 0)
+                    for (auto &c : z.connections) {
+                        ids.insert(c.id);
+                        printf(" %d", c.id);
+                    }
+
+        puts("");
+        for (int kk = 0; kk < n_connections; kk++) {
+            if (ids.count(kk) == 0)
+                printf("faltou %d\n", kk);
+        }
 
         puts("");
         assert(!fail);
@@ -759,7 +768,7 @@ Solution reconstruct_sol(const Solution &curr) {
     computeViolation(ret);
 #endif
 
-    count_conn(ret);
+    // count_conn(ret);
     return ret;
 }
 
@@ -830,7 +839,7 @@ Solution convertTo20MhzSol(Solution exps) {
         }
     }
 
-    count_conn(exps);
+    // count_conn(exps);
     while (!allChannels20MHz(exps)) {
         for (TimeSlot &ts : exps.slots) {
             for (Spectrum &sp : ts.spectrums) {
@@ -859,7 +868,7 @@ Solution convertTo20MhzSol(Solution exps) {
         }
     }
 
-    count_conn(exps);
+    // count_conn(exps);
 
     return exps;
 }
@@ -928,7 +937,7 @@ void K_AddDrop(Solution &sol, int K) {
         reinsert(sol, conn, channelFrom, channelTo, true);
     }
 
-    count_conn(sol);
+    // count_conn(sol);
 }
 
 void K_RemoveAndInserts(Solution &sol, int K) {
@@ -1141,8 +1150,8 @@ inline void addEverywhere(Solution &sol, int id) {
 Solution local_search(Solution &multiple, Solution &curr) {
     bool improved = false;
 
-    count_conn(multiple, true);
-    count_conn(curr);
+    // count_conn(multiple, true);
+    // count_conno(curr);
     do {
         improved = false;
         for (int i = 0; i < n_connections; i++) {
@@ -1152,11 +1161,16 @@ Solution local_search(Solution &multiple, Solution &curr) {
             Solution mult_cont(mult_clean);
             addEverywhere(mult_cont, i);
 
-            double bestOF = -1;
+#if MDVRBSP
+            double bestOF = numeric_limits<double>::max();
+#else
+            double bestOF = -1.0;
+#endif
             ti3 best_ch = make_tuple(-1, -1, -1);
 
             setDP(mult_clean);
-            bestOF = calcDP(multiple);
+            // bestOF = calcDP(multiple);
+            double origOF = calcDP(multiple);
 
             for (int t = 0; t < curr.slots.size(); t++) {
                 for (int s = 0; s < curr.slots[t].spectrums.size(); s++) {
@@ -1178,32 +1192,12 @@ Solution local_search(Solution &multiple, Solution &curr) {
                         }
 
                         double BB = calcDP(multiple, t, s);
-                        double result = bestOF - AA + BB;
+                        double result = origOF - AA + BB;
 
-                        if (compareObjectives(result, bestOF) > 0) {
+                        if (compareObjectives(result, bestOF) < 0) {
                             bestOF = result;
                             best_ch = make_tuple(t, s, c);
                         }
-
-                        //                         setDP(mult_clean);
-                        //                         int c_ch = c;
-                        //                         while (c_ch != -1) {
-                        // #ifdef MDVRBSP
-                        //                             chanOF[t][s][c_ch] =
-                        //                                 mult_cont.slots[t].spectrums[s].channels[c_ch].violation;
-                        // #else
-                        //                             chanOF[t][s][c_ch] =
-                        //                                 mult_cont.slots[t].spectrums[s].channels[c_ch].throughput;
-                        // #endif
-                        //                             c_ch = parent[t][s][c_ch];
-                        //                         }
-                        //
-                        //                         double OF = calcDP(multiple);
-                        //
-                        //                         if (compareObjectives(OF, bestOF) > 0) {
-                        //                             bestOF = OF;
-                        //                             best_ch = make_tuple(t, s, c);
-                        //                         }
                     }
                 }
             }
@@ -1214,39 +1208,25 @@ Solution local_search(Solution &multiple, Solution &curr) {
             int better = compareObjectives(bestOF, curr.throughput);
 #endif
 
-            if (better > 0) {
+            if (better < 0 && best_ch != make_tuple(-1, -1, -1)) {
                 improved = true;
-
 #ifdef MDVRBSP
                 curr.violation = bestOF;
 #else
                 curr.throughput = bestOF;
 #endif
-                for (int t = 0; t < multiple.slots.size(); t++) {
-                    for (int s = 0; s < multiple.slots[t].spectrums.size(); s++) {
-                        for (int c = 0; c < multiple.slots[t].spectrums[s].channels.size(); c++) {
-                            Channel &ch = multiple.slots[t].spectrums[s].channels[c];
-                            for (const Connection &conn : ch.connections) {
-                                if (conn.id == i) {
-                                    ch = deleteFromChannel(ch, conn.id);
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                multiple = mult_clean;
 
-                    int new_t = get<0>(best_ch);
-                    int new_sp = get<1>(best_ch);
-                    int new_ch = get<2>(best_ch);
-                    while (new_ch != -1) {
-                        multiple.slots[new_t].spectrums[new_sp].channels[new_ch] = insertInChannel(
-                            multiple.slots[new_t].spectrums[new_sp].channels[new_ch], i);
-                        new_ch = parent[new_t][new_sp][new_ch];
-                    }
+                int new_t = get<0>(best_ch);
+                int new_sp = get<1>(best_ch);
+                int new_ch = get<2>(best_ch);
+                while (new_ch != -1) {
+                    multiple.slots[new_t].spectrums[new_sp].channels[new_ch] = insertInChannel(
+                        multiple.slots[new_t].spectrums[new_sp].channels[new_ch], i);
+                    new_ch = parent[new_t][new_sp][new_ch];
                 }
             }
         }
-
     } while (improved);
 
     return reconstruct_sol(multiple);
@@ -1354,3 +1334,23 @@ inline void perturbation(Solution &sol, int kkmul) {
 }
 
 #endif
+
+//                         setDP(mult_clean);
+//                         int c_ch = c;
+//                         while (c_ch != -1) {
+// #ifdef MDVRBSP
+//                             chanOF[t][s][c_ch] =
+//                                 mult_cont.slots[t].spectrums[s].channels[c_ch].violation;
+// #else
+//                             chanOF[t][s][c_ch] =
+//                                 mult_cont.slots[t].spectrums[s].channels[c_ch].throughput;
+// #endif
+//                             c_ch = parent[t][s][c_ch];
+//                         }
+//
+//                         double OF = calcDP(multiple);
+//
+//                         if (compareObjectives(OF, bestOF) > 0) {
+//                             bestOF = OF;
+//                             best_ch = make_tuple(t, s, c);
+//                         }
