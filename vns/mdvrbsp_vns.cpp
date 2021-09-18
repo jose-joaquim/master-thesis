@@ -246,28 +246,44 @@ Solution vns(Solution initial, string filePrefix) {
     return incumbent;
 }
 
-Solution reductionHeuristic() {
+Solution reductionHeuristic(char **argv) {
+    string objImp = string(argv[3]);
+    objImp += "/objective_improvements" + string(argv[2]);
+    objImp += ".txt";
+
+    FILE *objImpOut = fopen(objImp.c_str(), "w");
+    assert(objImpOut != nullptr);
+
     Solution S_star = constructive_heuristic();
 
+    fprintf(objImpOut, "%.3lf, %lu\n", 0.0, S_star.slots.size());
     if (S_star.slots.size() == 1) {
         assert(yFeasible(S_star));
         printf("Constructive heuristic found feasible solution with only one time-slots.\n");
         return S_star;
     }
 
+    double currTime = 0.0, startTime = clock();
     printf("initial solution has %lu time-slots\n", S_star.slots.size());
     while (!stop() && S_star.slots.size() > 1) {
         Solution S1 = delete_time_slot(S_star);
 
         int cnt = 1;
-        while (yFeasible(S1) && ++cnt)
+        while (yFeasible(S1) && ++cnt) {
+            currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+            fprintf(objImpOut, "%.3lf, %lu\n", currTime, S1.slots.size());
+            
             S1 = delete_time_slot(S1);
+        }
 
         printf("removed %d ts. Violation is now %lf\n", cnt, S1.violation);
 
         S1 = vns(S1, string());
 
         if (yFeasible(S1)) {
+            currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+            fprintf(objImpOut, "%.3lf, %lu\n", currTime, S1.slots.size());
+            
             assert(is_feasible(S1));
             printf("found sol w/ violation %lf and %lu ts\n", S1.violation, S1.slots.size());
             S_star = S1;
@@ -275,6 +291,7 @@ Solution reductionHeuristic() {
             puts("vns did not found feasible solution");
     }
 
+    fclose(objImpOut);
     return S_star;
 }
 
@@ -305,7 +322,7 @@ int main(int argc, char **argv) {
     }
 
     maximumTime = stoi(argv[4]) * 1.0;
-    Solution inc = reductionHeuristic();
+    Solution inc = reductionHeuristic(argv);
     print_solution(inc);
     return 0;
 }

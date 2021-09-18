@@ -2,7 +2,7 @@
 
 make mdvrbsp
 # make mdcheck
-path_results="results/vns-vrbsp/U_"
+path_results="results/mdvrbsp/U_"
 
 max_time=10
 
