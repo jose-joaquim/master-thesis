@@ -2,7 +2,7 @@
 
 make vrbsp
 # make vrcheck
-path_results="results/vns-vrbsp/U_"
+path_results="results/vrbsp/U_"
 
 max_time=10
 
