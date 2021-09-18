@@ -160,7 +160,7 @@ Solution vns(string filePrefix) {
 
     Solution local_max = incumbent;
     double old_value = incumbent.throughput;
-    fprintf(outFile, "%.3lf %lf\n", 0.0, old_value);
+    fprintf(outFile, "%.2lf %.2lf\n", 0.0, old_value);
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
@@ -169,7 +169,6 @@ Solution vns(string filePrefix) {
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
-            // puts("begin");
             delta = local_max;
             perturbation(delta, k * K_MUL); // DONE
 
@@ -183,7 +182,6 @@ Solution vns(string filePrefix) {
             delta = convertTo20MhzSol(explicit_sol); // DONE
 
             if (compareObjectives(delta, local_max) < 0) {
-                // printf("%lf %lf\n", local_max.throughput, delta.throughput);
                 k = 1;
                 local_max = delta;
             } else
@@ -192,7 +190,7 @@ Solution vns(string filePrefix) {
             if (compareObjectives(local_max, incumbent) < 0) {
                 currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
                 if (outFile != nullptr)
-                    fprintf(outFile, "%.3lf %.3lf\n", currTime, local_max.throughput);
+                    fprintf(outFile, "%.3lf %.2lf\n", currTime, local_max.throughput);
 
                 printf("%lf %lf %lf\n", currTime, incumbent.throughput, local_max.throughput);
                 incumbent = explicit_sol;
@@ -202,7 +200,7 @@ Solution vns(string filePrefix) {
 
     double output_value = incumbent.throughput;
     currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-    printf("%.3lf %.3lf %.3lf\n", currTime, old_value, output_value);
+    printf("%.3lf %.2lf %.2lf\n", currTime, old_value, output_value);
     return incumbent;
 }
 

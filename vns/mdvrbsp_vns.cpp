@@ -234,10 +234,10 @@ Solution vns(Solution initial, string filePrefix) {
                 currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
 
                 if (objImpFile != nullptr)
-                    fprintf(objImpFile, "%lf %.3lf\n", currTime, local_min.violation);
+                    fprintf(objImpFile, "%lf %.2lf\n", currTime, local_min.violation);
 
                 first = false;
-                printf("%lf %.3lf %.3lf\n", currTime, local_min.violation, incumbent.violation);
+                printf("%lf %.2lf %.2lf\n", currTime, local_min.violation, incumbent.violation);
                 incumbent = explicit_sol;
             }
         }
@@ -256,7 +256,7 @@ Solution reductionHeuristic(char **argv) {
 
     Solution S_star = constructive_heuristic();
 
-    fprintf(objImpOut, "%.3lf, %lu\n", 0.0, S_star.slots.size());
+    fprintf(objImpOut, "%.2lf, %lu\n", 0.0, S_star.slots.size());
     if (S_star.slots.size() == 1) {
         assert(yFeasible(S_star));
         printf("Constructive heuristic found feasible solution with only one time-slots.\n");
