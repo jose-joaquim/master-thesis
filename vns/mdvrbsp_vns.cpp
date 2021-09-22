@@ -1,4 +1,4 @@
-// run 16 1 results/vns-vrbsp/U_16 10
+// run 8 1 results/mdvrbsp/U_8 10
 #include "VNS.h"
 
 bool is_feasible(const Solution &ret, bool retOption = true) {
@@ -194,13 +194,15 @@ Solution vns(Solution initial, string filePrefix) {
     Solution local_min = delta;
 
     int K_MUL = max(1, n_connections / 100);
-    int K_MAX = 10;
+    int K_MAX = min(n_connections, 10);
     bool first = true;
     double currTime = 0.0;
     startTime = clock();
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
+            // puts("begin");
+            assert(delta.slots[0].spectrums[3].channels[0].connections.empty());
             delta = local_min;
 
             perturbation(delta, k * K_MUL);
@@ -269,15 +271,17 @@ Solution reductionHeuristic(char **argv) {
         Solution S1 = delete_time_slot(S_star);
 
         int cnt = 1;
-        while (yFeasible(S1) && ++cnt) {
+        while (yFeasible(S1) && ++cnt && S1.slots.size() > 1LU) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
             fprintf(objImpOut, "%.3lf, %lu\n", currTime, S1.slots.size());
             
             S1 = delete_time_slot(S1);
         }
 
-        printf("removed %d ts. Violation is now %lf\n", cnt, S1.violation);
+        if (yFeasible(S1) && S1.slots.size() == 1LU)
+            return S1;
 
+        printf("removed %d ts. Violation is now %lf\n", cnt, S1.violation);
         S1 = vns(S1, string());
 
         if (yFeasible(S1)) {

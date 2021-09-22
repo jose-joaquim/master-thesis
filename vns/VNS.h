@@ -942,8 +942,8 @@ void K_AddDrop(Solution &sol, int K) {
 
 void K_RemoveAndInserts(Solution &sol, int K) {
     int k = 0;
-    ti3 channelZero = make_tuple(0, 3, 0);
 
+    Solution copySol(sol);
     // assert(is_feasible(sol, false));
     while (k < K) {
         int t = rng.randInt(sol.slots.size() - 1);
@@ -951,20 +951,19 @@ void K_RemoveAndInserts(Solution &sol, int K) {
         int b = rng.randInt(sol.slots[t].spectrums[a].channels.size() - 1);
 
 #ifdef MDVRBSP
-        if (make_tuple(t, a, b) == channelZero)
+        if (make_tuple(t, a, b) == zeroChannel)
             continue;
 #endif
 
         if (sol.slots[t].spectrums[a].channels[b].connections.empty())
             continue;
 
-        k++;
-
         Channel &ch = sol.slots[t].spectrums[a].channels[b];
         int z = rng.randInt(ch.connections.size() - 1);
         Connection conn = ch.connections[z];
 
-        reinsert(sol, conn, make_tuple(t, a, b), channelZero, true);
+        reinsert(sol, conn, make_tuple(t, a, b), zeroChannel, true);
+        k++;
     }
 
     K_AddDrop(sol, K);
