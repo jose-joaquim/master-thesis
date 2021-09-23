@@ -35,19 +35,15 @@ Solution constructive_heuristic() {
                     Channel split0 = insertInChannel(channelSplit[0], conn);
                     Channel split1 = insertInChannel(channelSplit[1], conn);
 
-                    int op = 0;
                     double conf1 = split0.throughput + channelSplit[1].throughput;
                     double conf2 = split1.throughput + channelSplit[0].throughput;
                     if (conf1 > conf2) {
                         channelSplit[0] = split0;
                     } else if (conf2 > conf1) {
-                        op = 1;
                         channelSplit[1] = split1;
                     } else if (split0.connections.size() < split1.connections.size()) {
-                        op = 2;
                         channelSplit[0] = split0;
                     } else {
-                        op = 3;
                         channelSplit[1] = split1;
                     }
                 }
@@ -198,9 +194,6 @@ Solution vns(string filePrefix) {
         }
     }
 
-    double output_value = incumbent.throughput;
-    currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-    printf("%.3lf %.2lf %.2lf\n", currTime, old_value, output_value);
     return incumbent;
 }
 
@@ -236,7 +229,7 @@ int main(int argc, char **argv) {
     print_solution_to_file(aux, file_out);
 
     // string path_obj = string(argv[3]);
-    // path_obj += "/objectivesxo.txt";
+    // path_obj += "/objectives.txt";
     // cout << path_obj << endl;
     // FILE *file_obj = fopen(path_obj.c_str(), "a");
     // print_objective_to_file(aux, file_obj);

@@ -29,7 +29,7 @@ using dd = std::pair<double, double>;
 using ti3 = std::tuple<int, int, int>;
 
 static MTRand rng;
-static int n_connections, n_spectrums, n_time_slots;
+static int n_connections, n_spectrums;
 static double alfa, noise, powerSender;
 static double receivers[MAX_CONN][2], senders[MAX_CONN][2];
 static double affectance[MAX_CONN][MAX_CONN];
@@ -47,7 +47,6 @@ static int parent[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static int child[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS][2];
 static double chanOF[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static bool inSolution[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
-static double sc_opt[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 
 #ifdef MDVRBSP
 static std::vector<double> gma;

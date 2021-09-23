@@ -258,7 +258,7 @@ Solution reductionHeuristic(char **argv) {
 
     Solution S_star = constructive_heuristic();
 
-    fprintf(objImpOut, "%.2lf, %lu\n", 0.0, S_star.slots.size());
+    fprintf(objImpOut, "%.2lf %lu\n", 0.0, S_star.slots.size());
     if (S_star.slots.size() == 1) {
         assert(yFeasible(S_star));
         printf("Constructive heuristic found feasible solution with only one time-slots.\n");
@@ -273,7 +273,7 @@ Solution reductionHeuristic(char **argv) {
         int cnt = 1;
         while (yFeasible(S1) && ++cnt && S1.slots.size() > 1LU) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-            fprintf(objImpOut, "%.3lf, %lu\n", currTime, S1.slots.size());
+            fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
             
             S1 = delete_time_slot(S1);
         }
@@ -286,7 +286,7 @@ Solution reductionHeuristic(char **argv) {
 
         if (yFeasible(S1)) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-            fprintf(objImpOut, "%.3lf, %lu\n", currTime, S1.slots.size());
+            fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
             
             assert(is_feasible(S1));
             printf("found sol w/ violation %lf and %lu ts\n", S1.violation, S1.slots.size());
@@ -327,6 +327,13 @@ int main(int argc, char **argv) {
 
     maximumTime = stoi(argv[4]) * 1.0;
     Solution inc = reductionHeuristic(argv);
-    print_solution(inc);
+    // print_solution(inc);
+
+    string path_out = string(argv[3]);
+    path_out += "/solution" + string(argv[2]);
+    path_out += ".txt";
+    cout << path_out << endl;
+    FILE *file_out = fopen(path_out.c_str(), "w");
+    print_solution_to_file(inc, file_out);
     return 0;
 }

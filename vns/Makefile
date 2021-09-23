@@ -1,3 +1,6 @@
+vns:
+	g++ -Wall -std=c++11 VNS.h
+
 vrbsp:
 	g++ -Wall -std=c++11 -g -o vrbsp_vns vrbsp_vns.cpp
 
