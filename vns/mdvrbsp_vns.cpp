@@ -50,10 +50,9 @@ bool can_split(const Channel &ch) {
 bool try_insert(int conn_id, Channel &ch) {
     ch = insertInChannel(ch, conn_id);
 
-    for (Connection &conn : ch.connections) {
-        if (conn.throughput < gma[conn.id])
+    for (Connection &conn : ch.connections)
+        if (definitelyLessThan(conn.throughput, gma[conn.id]))
             return false;
-    }
 
     return true;
 }
@@ -68,7 +67,6 @@ Solution constructive_heuristic() {
 
     shuffle(links.begin(), links.end(), whatever);
     for (int conn : links) {
-        // printf("tentando inserir conexao %d\n", conn);
         bool success = false;
         for (int t = 0; t < ret.slots.size(); t++) {
             for (int s = 0; s < ret.slots[t].spectrums.size(); s++) {
@@ -76,8 +74,9 @@ Solution constructive_heuristic() {
                     break;
 
                 for (int c = 0; c < ret.slots[t].spectrums[s].channels.size(); c++) {
-                    if (t == 0 && s == 3 && c == 0)
+                    if (make_tuple(t, s, c) == zeroChannel)
                         continue;
+
                     // 1. Tentar inserir no canal c
                     //    - sucesso: break
                     //    - falha: verificar se eh possivel split(c)
@@ -127,6 +126,10 @@ Solution constructive_heuristic() {
                     }
                 }
             }
+
+            // if (!success) {
+            //     TimeSlot new_ts(dummy_ts);
+            // }
 
             // 2. Se chegou ate aqui e link nao foi inserido:
             //    - crie novo time-slot e insira no canal de maior largura de banda
@@ -274,7 +277,7 @@ Solution reductionHeuristic(char **argv) {
         while (yFeasible(S1) && ++cnt && S1.slots.size() > 1LU) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
             fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
-            
+
             S1 = delete_time_slot(S1);
         }
 
@@ -287,7 +290,7 @@ Solution reductionHeuristic(char **argv) {
         if (yFeasible(S1)) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
             fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
-            
+
             assert(is_feasible(S1));
             printf("found sol w/ violation %lf and %lu ts\n", S1.violation, S1.slots.size());
             S_star = S1;

@@ -39,7 +39,7 @@ static std::vector<int> spectrum_size;
 
 static const int MAX_SPECTRUM = 5;
 static const int MAX_CHANNELS = 45;
-static const int MAX_SLOTS = 250; // TODO: This is a high value
+static const int MAX_SLOTS = 2048;
 static double startTime;
 static clock_t maximumTime;
 
