@@ -278,6 +278,7 @@ Solution reductionHeuristic(char **argv) {
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
             fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
 
+            S_star = S1;
             S1 = delete_time_slot(S1);
         }
 
