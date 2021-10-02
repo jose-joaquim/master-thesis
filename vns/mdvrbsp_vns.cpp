@@ -248,6 +248,9 @@ Solution vns(Solution initial, string filePrefix) {
         }
     }
 
+    if (essentiallyEqual(incumbent.violation, 0.0))
+        assert(is_feasible(incumbent));
+
     return incumbent;
 }
 
@@ -289,6 +292,7 @@ Solution reductionHeuristic(char **argv) {
         S1 = vns(S1, string());
 
         if (yFeasible(S1)) {
+            count_conn(S1);
             currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
             fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
 
@@ -300,6 +304,7 @@ Solution reductionHeuristic(char **argv) {
     }
 
     fclose(objImpOut);
+    count_conn(S_star);
     return S_star;
 }
 
