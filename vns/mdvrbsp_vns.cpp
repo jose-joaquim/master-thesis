@@ -220,6 +220,7 @@ Solution vns(Solution initial, string filePrefix) {
 
             if (essentiallyEqual(explicit_sol.violation, 0.0)) {
                 printf("found solution with violation 0.0!\n");
+                count_conn(explicit_sol);
                 return explicit_sol;
             }
 
@@ -236,6 +237,7 @@ Solution vns(Solution initial, string filePrefix) {
 
             // if (definitelyLessThan(local_min.violation, incumbent.violation) || first) {
             if (compareObjectives(local_min, incumbent) < 0 || first) {
+                count_conn(explicit_sol);
                 currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
 
                 if (objImpFile != nullptr)

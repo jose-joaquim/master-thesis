@@ -726,7 +726,7 @@ int count_conn(const Solution &sol, bool op = false) {
         }
 
         puts("");
-        assert(!fail);
+        assert(false);
     }
     return ret;
 }
