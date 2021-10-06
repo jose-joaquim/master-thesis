@@ -120,7 +120,7 @@ def read_instance(
     SINR,
     interferenceMatrix,
     distanceMatrix,
-    affectance,
+    AFF,
 ):
     with open(path, "r") as f:
         aux = f.readline().split()
@@ -197,7 +197,7 @@ def read_instance(
         for i in range(nConnections):
             for j in range(nConnections):
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
-                affectance[i][j] = value
+                AFF[i][j] = value
 
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
@@ -213,7 +213,7 @@ def insertLinkInto(
     timeslot,
     channel,
     interferenceMatrix,
-    affectance,
+    AFF,
     noise,
     beta,
     SINR,
@@ -249,7 +249,7 @@ def insertLinkInto(
 
         linkSINR = sys.float_info.max
         if linkInterference != 0.0:
-            linkSINR = affectance[i][i] / (linkInterference + noise)
+            linkSINR = AFF[i][i] / (linkInterference + noise)
 
         # print(
         #     "SINR COMPUTADO FOI "

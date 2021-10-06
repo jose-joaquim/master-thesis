@@ -10,6 +10,6 @@ do
     do
         path_results_final=${path_results}${inst};
         echo $path_results_final
-        ./mdvrbsp_linear1.py ${inst} ${v} ${path_results_final} 0
+        ./mdvrbsp_bigm_imp2.py ${inst} ${v} ${path_results_final} 1
     done;
 done

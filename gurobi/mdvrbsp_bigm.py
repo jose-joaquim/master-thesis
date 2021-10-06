@@ -249,6 +249,7 @@ def optimization(
                     return
 
         model.write("model.lp")
+        model.write("old.mps")
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
         model.setParam("LogFile", file_log)
         model.setParam("LogToConsole", 0)

@@ -4,13 +4,13 @@ make mdvrbsp
 # make mdcheck
 path_results="results/mdvrbsp/U_"
 
-max_time=600
+max_time=15
 
-lower=9
-upper=9
+lower=1
+upper=10
 for ((v=lower;v<=upper;v++));
 do
-    for inst in 512;
+    for inst in 16;
     do
         path_results_final=${path_results}${inst};
         echo $path_results_final

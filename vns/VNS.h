@@ -178,6 +178,8 @@ Solution vns(string);
 
 Solution constructive_heuristic(void);
 
+Solution constructive_heuristic(string);
+
 bool is_feasible(const Solution &, bool);
 
 int bwIdx(int bw) {
@@ -1148,8 +1150,6 @@ inline void addEverywhere(Solution &sol, int id) {
 Solution local_search(Solution &multiple, Solution &curr) {
     bool improved = false;
 
-    // count_conn(multiple, true);
-    // count_conno(curr);
     do {
         improved = false;
         for (int i = 0; i < n_connections; i++) {
@@ -1332,23 +1332,3 @@ inline void perturbation(Solution &sol, int kkmul) {
 }
 
 #endif
-
-//                         setDP(mult_clean);
-//                         int c_ch = c;
-//                         while (c_ch != -1) {
-// #ifdef MDVRBSP
-//                             chanOF[t][s][c_ch] =
-//                                 mult_cont.slots[t].spectrums[s].channels[c_ch].violation;
-// #else
-//                             chanOF[t][s][c_ch] =
-//                                 mult_cont.slots[t].spectrums[s].channels[c_ch].throughput;
-// #endif
-//                             c_ch = parent[t][s][c_ch];
-//                         }
-//
-//                         double OF = calcDP(multiple);
-//
-//                         if (compareObjectives(OF, bestOF) > 0) {
-//                             bestOF = OF;
-//                             best_ch = make_tuple(t, s, c);
-//                         }
