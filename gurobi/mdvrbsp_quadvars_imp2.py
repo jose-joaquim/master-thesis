@@ -83,7 +83,7 @@ def defineModel(N, NTS, AFF, AUXNC):
     t, x, I_, z, w = variables()
     constraints(t, x, I_, z, w)
     objective(t)
-    return m
+    return m, x, I_
 
 
 def optimization(
@@ -130,10 +130,37 @@ def optimization(
 
         dicCH = {i: auxNC[i] for i in range(len(auxNC))}
 
-        m = defineModel(nConnections, nTimeSlots, affectance, dicCH)
+        m, x, I_ = defineModel(nConnections, nTimeSlots, affectance, dicCH)
 
         m.write("quad_imp2.lp")
+        file_log = to_write + "/log-inst" + str(inst) + ".txt"
+        m.setParam("LogFile", file_log)
+        m.setParam("LogToConsole", 0)
+        m.setParam("TimeLimit", 60)
+        m.setParam("IntFeasTol", 1e-7)
+
         m.optimize()
+
+        if m.status == GRB.OPTIMAL:
+            file_ri = to_write + "/result_information.txt"
+            with open(file_ri, "a") as output_re:
+                output_re.write(str(inst) + " ")
+                for i in range(len(rst_headers) - 1):
+                    output_re.write(str(m.getAttr(rst_headers[i])) + " ")
+                output_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
+                output_re.write("\n")
+
+            m.write("solution.sol")
+            file_name = to_write + "/out-formatted" + str(inst) + ".txt"
+            # conn, channel, MCS, interference
+            with open(file_name, "a") as f:
+                f.write(str(m.objVal) + "\n")
+                for i in range(nConnections):
+                    for c in range(nChannels):
+                        for t in range(nTimeSlots):
+                            # print("%d %d %d" % (i, c, t))
+                            if x[i, c, t].x == 1.0:
+                                f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
