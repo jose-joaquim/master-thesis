@@ -134,10 +134,10 @@ def optimization(
 
         m.write("quad_imp2.lp")
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
-        m.setParam("LogFile", file_log)
-        m.setParam("LogToConsole", 0)
-        m.setParam("TimeLimit", 60)
-        m.setParam("IntFeasTol", 1e-7)
+        m.Params.logFile = file_log
+        m.Params.logToConsole = 0
+        m.Params.timeLimit = 3600
+        m.Params.intFeasTol = 1e-5
 
         m.optimize()
 
@@ -156,9 +156,8 @@ def optimization(
             with open(file_name, "a") as f:
                 f.write(str(m.objVal) + "\n")
                 for i in range(nConnections):
-                    for c in range(nChannels):
+                    for c in dicCH:
                         for t in range(nTimeSlots):
-                            # print("%d %d %d" % (i, c, t))
                             if x[i, c, t].x == 1.0:
                                 f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 

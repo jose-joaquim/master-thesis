@@ -185,10 +185,10 @@ def optimization(
 
         m.write("bigm_imp2.lp")
         file_log = to_write + "/log-inst" + str(inst) + ".txt"
-        m.setParam("LogFile", file_log)
-        m.setParam("LogToConsole", 0)
-        m.setParam("TimeLimit", 60)
-        m.setParam("IntFeasTol", 1e-7)
+        m.Params.logFile = file_log
+        m.Params.logToConsole = 0
+        m.Params.timeLimit = 3600
+        m.Params.intFeasTol = 1e-5
 
         m.optimize()
 
