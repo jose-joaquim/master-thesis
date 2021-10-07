@@ -192,26 +192,45 @@ def optimization(
 
         m.optimize()
 
-        if m.status == GRB.OPTIMAL:
-            file_ri = to_write + "/result_information.txt"
-            with open(file_ri, "a") as output_re:
-                output_re.write(str(inst) + " ")
-                for i in range(len(rst_headers) - 1):
-                    output_re.write(str(m.getAttr(rst_headers[i])) + " ")
-                output_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
-                output_re.write("\n")
+        file_ri = to_write + "/result_information.txt"
+        with open(file_ri, "a") as output_re:
+            output_re.write(str(inst) + " ")
+            for i in range(len(rst_headers) - 1):
+                output_re.write(str(m.getAttr(rst_headers[i])) + " ")
+            output_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
+            output_re.write("\n")
+        
+        m.write("solution.sol")
+        file_name = to_write + "/out-formatted" + str(inst) + ".txt"
+        # conn, channel, MCS, interference
+        with open(file_name, "a") as f:
+            f.write(str(m.objVal) + "\n")
+            for i in range(nConnections):
+                for c in dicCH:
+                    for t in range(nTimeSlots):
+                        if x[i, c, t].x == 1.0:
+                            f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 
-            m.write("solution.sol")
-            file_name = to_write + "/out-formatted" + str(inst) + ".txt"
-            # conn, channel, MCS, interference
-            with open(file_name, "a") as f:
-                f.write(str(m.objVal) + "\n")
-                for i in range(nConnections):
-                    for c in dicCH:
-                        for t in range(nTimeSlots):
-                            # print("%d %d %d" % (i, c, t))
-                            if x[i, c, t].x == 1.0:
-                                f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
+        # if m.status == GRB.OPTIMAL:
+        #     file_ri = to_write + "/result_information.txt"
+        #     with open(file_ri, "a") as output_re:
+        #         output_re.write(str(inst) + " ")
+        #         for i in range(len(rst_headers) - 1):
+        #             output_re.write(str(m.getAttr(rst_headers[i])) + " ")
+        #         output_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
+        #         output_re.write("\n")
+        # 
+        #     m.write("solution.sol")
+        #     file_name = to_write + "/out-formatted" + str(inst) + ".txt"
+        #     # conn, channel, MCS, interference
+        #     with open(file_name, "a") as f:
+        #         f.write(str(m.objVal) + "\n")
+        #         for i in range(nConnections):
+        #             for c in dicCH:
+        #                 for t in range(nTimeSlots):
+        #                     # print("%d %d %d" % (i, c, t))
+        #                     if x[i, c, t].x == 1.0:
+        #                         f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
