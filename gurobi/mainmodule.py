@@ -306,26 +306,25 @@ def postProcess(m, x, I_, N, NTS, dic):
     if m.status == GRB.INFEASIBLE:
         m.computeIIS()
         m.write("conflict.ilp")
+    else:
+        file_ri = sys.argv[3] + "/result_information.txt"
+        with open(file_ri, "a") as out_re:
+            out_re.write(str(sys.argv[2]) + " ")
+            for i in range(len(rst_headers) - 1):
+                out_re.write(str(m.getAttr(rst_headers[i])) + " ")
+            out_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
+            out_re.write("\n")
 
-    # m.write("sol.sol")
-    # file_ri = sys.argv[3] + "/result_information.txt"
-    # with open(file_ri, "a") as out_re:
-    #     out_re.write(str(sys.argv[2]) + " ")
-    #     for i in range(len(rst_headers) - 1):
-    #         out_re.write(str(m.getAttr(rst_headers[i])) + " ")
-    #     out_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
-    #     out_re.write("\n")
-    #
-    # m.write("solution.sol")
-    # file_name = sys.argv[3] + "/out-formatted" + str(sys.argv[2]) + ".txt"
-    # # conn, channel, MCS, interference
-    # with open(file_name, "a") as f:
-    #     f.write(str(m.objVal) + "\n")
-    #     for i in range(N):
-    #         for c in dic:
-    #             for t in range(NTS):
-    #                 if x[i, c, t].x == 1.0:
-    #                     f.write("%d %d %d %.12f\n" % (i, c, t, I_[i, t].x))
+            if m.status == GRB.OPTIMAL:
+                file_name = sys.argv[3] + "/out-formatted" + str(sys.argv[2]) + ".txt"
+                # conn, channel, MCS, interference
+                with open(file_name, "a") as f:
+                    f.write(str(m.objVal) + "\n")
+                    for i in range(N):
+                        for c in dic:
+                            for t in range(NTS):
+                                if x[i, c, t].x == 1.0:
+                                    f.write("%d %d %d %.12f\n" % (i, c, t, I_[i, t].x))
 
 
 def readFromFile(fp, x):
