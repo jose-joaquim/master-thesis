@@ -216,7 +216,6 @@ def read_instance(
 
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
-            # gamma[i] = 1.0  # TODO: lembrar de remover!!!
             for i in range(4):
                 beta[j][i] = gammaToBeta(gamma[j], dataRates, SINR, i)
 
@@ -297,7 +296,7 @@ def initialize():
         sys.exit(1)
 
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
-    return N, 1, SINR, PS, NOI, B, IM, DM, AFF, DR
+    return N, ans, SINR, PS, NOI, B, IM, DM, AFF, DR
 
 
 def postProcess(m, x, I_, N, NTS, dic):

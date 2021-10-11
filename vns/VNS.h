@@ -24,9 +24,9 @@ const double EPS = 1e-9;
 
 using namespace std;
 
-using ii = std::pair<int, int>;
-using dd = std::pair<double, double>;
-using ti3 = std::tuple<int, int, int>;
+using ii = pair<int, int>;
+using dd = pair<double, double>;
+using ti3 = tuple<int, int, int>;
 
 static MTRand rng;
 static int n_connections, n_spectrums;
@@ -34,8 +34,8 @@ static double alfa, noise, powerSender;
 static double receivers[MAX_CONN][2], senders[MAX_CONN][2];
 static double affectance[MAX_CONN][MAX_CONN];
 static double distanceMatrix[MAX_CONN][MAX_CONN], interferenceMatrix[MAX_CONN][MAX_CONN];
-static std::vector<std::vector<double>> dataRates, SINR, beta;
-static std::vector<int> spectrum_size;
+static vector<vector<double>> dataRates, SINR, beta;
+static vector<int> spectrum_size;
 
 static const int MAX_SPECTRUM = 5;
 static const int MAX_CHANNELS = 45;
@@ -49,11 +49,11 @@ static double chanOF[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static bool inSolution[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 
 #ifdef MDVRBSP
-static std::vector<double> gma;
+static vector<double> gma;
 #endif
 
-std::random_device rd;
-auto whatever = std::default_random_engine{rd()};
+random_device rd;
+auto whatever = default_random_engine{rd()};
 static ti3 zeroChannel = {0, 3, 0};
 
 struct Connection {
@@ -85,18 +85,18 @@ struct Channel {
     double interference;
     double violation;
     int bandwidth;
-    std::vector<Connection> connections;
+    vector<Connection> connections;
 
     bool operator<(const Channel &other) const { return bandwidth < other.bandwidth; }
 
     bool operator>(const Channel &other) const { return !operator<(other); }
 
     Channel(double throughput, double interference, double violation, int bandwidth,
-            const std::vector<Connection> connections)
+            const vector<Connection> connections)
         : throughput(throughput), interference(interference), violation(violation),
           bandwidth(bandwidth), connections(connections) {}
 
-    Channel(int bandwidth) : Channel(0.0, 0.0, 0.0, bandwidth, std::vector<Connection>()) {}
+    Channel(int bandwidth) : Channel(0.0, 0.0, 0.0, bandwidth, vector<Connection>()) {}
 
     Channel() : Channel(0.0) {}
 };
@@ -105,9 +105,9 @@ struct Spectrum {
     int maxFrequency;
     int usedFrequency;
     double interference;
-    std::vector<Channel> channels;
+    vector<Channel> channels;
 
-    Spectrum(int maxFrequency, int usedFrequency, const std::vector<Channel> channels)
+    Spectrum(int maxFrequency, int usedFrequency, const vector<Channel> channels)
         : maxFrequency(maxFrequency), usedFrequency(usedFrequency), channels(channels) {
         interference = 0.0;
     }
@@ -116,31 +116,31 @@ struct Spectrum {
         maxFrequency = 0;
         usedFrequency = 0;
         interference = 0.0;
-        channels = std::vector<Channel>();
+        channels = vector<Channel>();
     }
 };
 
 struct TimeSlot {
-    std::vector<Spectrum> spectrums;
+    vector<Spectrum> spectrums;
     double interference;
     double throughput;
 
-    TimeSlot(const std::vector<Spectrum> sp) : spectrums(sp) {}
+    TimeSlot(const vector<Spectrum> sp) : spectrums(sp) {}
     TimeSlot() {
         interference = 0.0;
         throughput = 0.0;
-        spectrums = std::vector<Spectrum>();
+        spectrums = vector<Spectrum>();
     }
 };
 
 class Solution {
   public:
-    std::vector<TimeSlot> slots;
+    vector<TimeSlot> slots;
     double throughput;
     double violation;
     bool throughput_flag;
 
-    Solution(const std::vector<Spectrum> sp, double tot, bool flag)
+    Solution(const vector<Spectrum> sp, double tot, bool flag)
         : throughput(tot), throughput_flag(flag) {
         slots.emplace_back(sp);
         violation = 0.0;
@@ -153,7 +153,7 @@ class Solution {
     }
 
     Solution() {
-        slots = std::vector<TimeSlot>();
+        slots = vector<TimeSlot>();
         throughput = 0.0;
         violation = 0.0;
         throughput_flag = true;
@@ -250,8 +250,7 @@ inline double distance(double X_si, double Y_si, double X_ri, double Y_ri) {
     return hypot((X_si - X_ri), (Y_si - Y_ri));
 }
 
-void convertTableToMW(const std::vector<std::vector<double>> &_SINR,
-                      std::vector<std::vector<double>> &__SINR) {
+void convertTableToMW(const vector<vector<double>> &_SINR, vector<vector<double>> &__SINR) {
     double result, b;
     for (int i = 0; i < __SINR.size(); i++) {
         for (int j = 0; j < __SINR[i].size(); j++) {
@@ -340,7 +339,7 @@ int cToBIdx(int c) {
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static std::vector<Spectrum> init_conf;
+static vector<Spectrum> init_conf;
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 void initTimeSlot() {
@@ -371,7 +370,7 @@ void read_data() {
         int s;
         scanf("%d", &s);
         spectrum_size.emplace_back(s);
-        init_conf.emplace_back(s, 0, std::vector<Channel>());
+        init_conf.emplace_back(s, 0, vector<Channel>());
     }
 
     if (noise != 0) {
@@ -400,7 +399,7 @@ void read_data() {
 #endif
     }
 
-    dataRates.assign(12, std::vector<double>(4, 0));
+    dataRates.assign(12, vector<double>(4, 0));
     for (int i = 0; i < 12; i++) {
         for (int j = 0; j < 4; j++) {
             double a;
@@ -409,7 +408,7 @@ void read_data() {
         }
     }
 
-    SINR.assign(12, std::vector<double>(4, 0));
+    SINR.assign(12, vector<double>(4, 0));
     for (int i = 0; i < 12; i++) {
         for (int j = 0; j < 4; j++) {
             double a;
@@ -433,13 +432,13 @@ void read_data() {
     // Select random dataRates from the table
     vector<double> aux;
     for (int i = 0; i < int(dataRates.size()); i++)
-        std::for_each(dataRates[i].begin(), dataRates[i].end(),
-                      [&aux](double x) { aux.emplace_back(x); });
+        for_each(dataRates[i].begin(), dataRates[i].end(),
+                 [&aux](double x) { aux.emplace_back(x); });
 
     for (int i = 0; i < n_connections; i++)
         gma[i] = aux[rng.randInt(aux.size() - 1)];
-    
-    beta.assign(n_connections, std::vector<double>(4, 0));
+
+    beta.assign(n_connections, vector<double>(4, 0));
     for (int i = 0; i < n_connections; i++) {
 
         for (int j = 0; j < 4; j++) {
@@ -499,11 +498,15 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
 }
 
 void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
-    if (file == nullptr) {
+    if (file == nullptr)
         file = fopen("./solution.txt", "w");
-    }
 
-    fprintf(file, "%lf %d\n", sol.throughput, int(sol.slots.size()));
+#ifdef MDVRBSP
+    for_each(gma.begin(), gma.end(), [&file](double x) { fprintf(file, "%.4lf ", x); });
+    fprintf(file, "\n");
+#endif
+
+    fprintf(file, "\n%lf %d\n", sol.throughput, int(sol.slots.size()));
     for (int t = 0; t < sol.slots.size(); t++) {
         fprintf(file, "%d\n", int(sol.slots[t].spectrums.size()));
         for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
@@ -749,7 +752,7 @@ Solution reconstruct_sol(const Solution &curr) {
 
     for (int t = 0; t < curr.slots.size(); t++) {
         ret.slots[t].spectrums.resize(curr.slots[t].spectrums.size(),
-                                      Spectrum(0.0, 0.0, std::vector<Channel>()));
+                                      Spectrum(0.0, 0.0, vector<Channel>()));
     }
 
     for (int t = 0; t < curr.slots.size(); t++) {
@@ -861,7 +864,7 @@ Solution convertTo20MhzSol(Solution exps) {
                     int newBw = sp.channels[c].bandwidth / 2;
                     Channel child1(newBw), child2(newBw);
 
-                    std::vector<Connection> connections = sp.channels[c].connections;
+                    vector<Connection> connections = sp.channels[c].connections;
 
                     for (Connection &conn : connections) {
                         if (rng.randInt(1)) {
