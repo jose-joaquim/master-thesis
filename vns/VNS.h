@@ -430,8 +430,18 @@ void read_data() {
     }
 
 #ifdef MDVRBSP
+    // Select random dataRates from the table
+    vector<double> aux;
+    for (int i = 0; i < int(dataRates.size()); i++)
+        std::for_each(dataRates[i].begin(), dataRates[i].end(),
+                      [&aux](double x) { aux.emplace_back(x); });
+
+    for (int i = 0; i < n_connections; i++)
+        gma[i] = aux[rng.randInt(aux.size() - 1)];
+    
     beta.assign(n_connections, std::vector<double>(4, 0));
     for (int i = 0; i < n_connections; i++) {
+
         for (int j = 0; j < 4; j++) {
             double value = gammaToBeta(gma[i], j);
             beta[i][j] = value;

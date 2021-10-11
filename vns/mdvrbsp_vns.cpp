@@ -27,9 +27,12 @@ bool is_feasible(const Solution &ret, bool retOption = true) {
         puts("");
     }
 
-    if (retOption)
+    if (retOption) {
+        assert(cnt == n_connections);
         return cnt == n_connections;
+    }
 
+    assert(cnt >= n_connections);
     return cnt >= n_connections;
 }
 
@@ -161,7 +164,6 @@ Solution constructive_heuristic(string filePrefix) {
     computeThroughput(ret);
     double finish = clock();
 
-    cout << " AAAA " << filePrefix << endl;
     if (!filePrefix.empty()) {
         FILE *objFile = fopen(filePrefix.c_str(), "w");
         fprintf(objFile, "%.3lf %lu\n",

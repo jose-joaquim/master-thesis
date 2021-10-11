@@ -1,6 +1,9 @@
+#! /usr/bin/env python3
+
 import math
 import sys
 import copy
+import secrets
 
 overlap = []
 nChannels = 45
@@ -16,6 +19,17 @@ rst_headers = [
     "Runtime",
 ]
 ch_intervals = [[0, 24], [25, 37], [38, 43], [44, 45]]
+
+box_channels = [
+    [[0, 1, 2, 3, 4, 5, 6, 7], [25, 26, 27, 28], [37, 38], [43]],
+    [
+        [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+        [29, 30, 31, 32, 33, 34],
+        [39, 40, 41],
+        [44],
+    ],
+    [[20, 21, 22, 23, 24], [35, 36], [42]],
+]
 
 
 def cToBIdx(c):
@@ -132,6 +146,7 @@ def read_instance(
         # gamma = float(aux[4])
         n_spectrums = int(aux[4])
         specs = []
+        aux_dr = []
 
         for i in range(n_spectrums):
             specs.append(int(aux[5 + i]))
@@ -148,14 +163,12 @@ def read_instance(
         for i in range(nConnections):
             line = f.readline()
             aux = line.split()
-            # receivers.append([float(aux[0]), float(aux[1])])
             receivers[i] = [float(aux[0]), float(aux[1])]
 
         f.readline()
         for i in range(nConnections):
             line = f.readline()
             aux = line.split()
-            # senders.append([float(aux[0]), float(aux[1])])
             senders[i] = [float(aux[0]), float(aux[1])]
 
         f.readline()
@@ -168,10 +181,9 @@ def read_instance(
             line = f.readline()
             aux = line.split()
 
-            # dataRates.append([])
             for j in range(4):
                 dataRates[i][j] = float(aux[j])
-                # dataRates.append(float(aux[j]))
+                aux_dr.append(dataRates[i][j])
 
         f.readline()
         for i in range(12):
@@ -180,7 +192,6 @@ def read_instance(
 
             for j in range(4):
                 SINR[i][j] = float(aux[j])
-                # SINR[i].append(float(aux[j]))
 
         convertTableToMW(SINR, SINR)
 
@@ -199,167 +210,17 @@ def read_instance(
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 AFF[i][j] = value
 
+        # secretsGen = secrets.SystemRandom()
+        # for i in range(len(gamma)):
+        #     gamma[i] = aux_dr[secretsGen.choice(range(0, len(aux_dr)))]
+
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
+            # gamma[i] = 1.0  # TODO: lembrar de remover!!!
             for i in range(4):
                 beta[j][i] = gammaToBeta(gamma[j], dataRates, SINR, i)
 
         return noise, powerSender, alfa, nConnections, time_slots, beta
-
-
-def insertLinkInto(
-    insertedLinks,
-    link,
-    timeslot,
-    channel,
-    interferenceMatrix,
-    AFF,
-    noise,
-    beta,
-    SINR,
-):
-    # print(
-    #     "aqui ("
-    #     + str(timeslot)
-    #     + ", "
-    #     + str(channel)
-    #     + ") tem  "
-    #     + str(len(insertedLinks))
-    #     + " conexoes"
-    # )
-    if not insertedLinks:
-        # print("opa")
-        insertedLinks.append(link)
-
-        m = 11
-        maxChannelSINR = SINR[m][cToBIdx(channel)]
-
-        if maxChannelSINR < beta[link][cToBIdx(channel)]:
-            return False
-        else:
-            return True
-
-    # Computar novas interferencias
-    insertedLinks.append(link)
-    for i in range(len(insertedLinks)):
-        linkInterference = 0.0
-        for j in range(len(insertedLinks)):
-            if i != j:
-                linkInterference += interferenceMatrix[j][i]
-
-        linkSINR = sys.float_info.max
-        if linkInterference != 0.0:
-            linkSINR = AFF[i][i] / (linkInterference + noise)
-
-        # print(
-        #     "SINR COMPUTADO FOI "
-        #     + str(linkSINR)
-        #     + " beta nesse canal eh "
-        #     + str(beta[link][cToBIdx(channel)])
-        # )
-        if linkSINR < beta[link][cToBIdx(channel)]:
-            return False
-
-    return True
-
-
-def read_from_file():
-    # TODO: The order of the insertion matters in the construction
-    print("reading from file")
-    single_spec = [160, 240, 100]
-    used_specs = [single_spec.copy()]
-    conns_schedule = {}
-    qtd_slots = 0
-
-    list_of_channels = []
-    with open("./warm.txt", "r") as f:
-        qtd_slots = int(f.readline())
-        print("tem %d slots" % (qtd_slots))
-        for slot in range(qtd_slots):
-            qtd_channel = int(f.readline())
-            # print("tem %d canais" % (qtd_channel))
-            for ch in range(qtd_channel):
-                aux = f.readline().split()
-                # print(aux)
-                list_of_channels.append(aux)
-
-    list_of_channels.sort()
-    for el in list_of_channels:
-        bw = int(el[0])
-
-        for conn in range(1, len(el)):
-            go_next = False
-            print("tentando inserir conn %s" % el[conn])
-            for ts in range(len(used_specs)):
-                if go_next:
-                    break
-
-                for sp in range(len(used_specs[ts])):
-                    print("nesse spec slice tem %d livres" % (used_specs[ts][sp]))
-                    if used_specs[ts][sp] >= bw:
-                        used_specs[ts][sp] -= bw
-                        print("inseri em (%d, %d)" % (ts, sp))
-                        if (ts, sp) in conns_schedule:
-                            conns_schedule[(ts, sp)].append(el[conn])
-                        else:
-                            conns_schedule[(ts, sp)] = [bw, el[conn]]
-
-                        go_next = True
-                        break
-
-            if not go_next:  # Need an additional time-slot
-                print(" CRIEI SLOT A MAIS")
-                used_specs.append(single_spec.copy())
-                used_specs[-1][0] -= bw
-                conns_schedule[(len(used_specs) - 1, 0)] = [bw, el[conn]]
-                print("inseri em (%d, %d)" % (len(used_specs) - 1, 0))
-
-    # with open("./warm.txt", "r") as f:
-    #     qtd_slots = int(f.readline())
-    #     print("tem %d slots" % (qtd_slots))
-    #     for slot in range(qtd_slots):
-    #         qtd_channel = int(f.readline())
-    #         print("tem %d canais" % (qtd_channel))
-    #         for ch in range(qtd_channel):
-    #             aux = f.readline().split()
-    #             print("   um canal com:", end="")
-    #             print(aux)
-    #             bw = int(aux[0])
-    #
-    #             for conn in range(1, len(aux)):
-    #                 go_next = False
-    #                 print("tentando inserir conn %s" % aux[conn])
-    #                 for ts in range(len(used_specs)):
-    #                     if go_next:
-    #                         break
-    #
-    #                     for sp in range(len(used_specs[ts])):
-    #                         print(
-    #                             "nesse spec slice tem %d livres" % (used_specs[ts][sp])
-    #                         )
-    #                         if used_specs[ts][sp] >= bw:
-    #                             used_specs[ts][sp] -= bw
-    #                             print("inseri em (%d, %d)" % (ts, sp))
-    #                             if (ts, sp) in conns_schedule:
-    #                                 conns_schedule[(ts, sp)].append(aux[conn])
-    #                             else:
-    #                                 conns_schedule[(ts, sp)] = [bw, aux[conn]]
-    #
-    #                             go_next = True
-    #                             break
-    #
-    #                 if not go_next:  # Need an additional time-slot
-    #                     print(" CRIEI SLOT A MAIS")
-    #                     used_specs.append(single_spec.copy())
-    #                     used_specs[-1][0] -= bw
-    #                     conns_schedule[(len(used_specs) - 1, 0)] = [bw, aux[conn]]
-    #                     print("inseri em (%d, %d)" % (len(used_specs) - 1, 0))
-
-    if len(used_specs) > qtd_slots:
-        print("MORE SLOTS THAN ALLOWED. EXITING PROGRAM...")
-        sys.exit(1)
-
-    return qtd_slots, conns_schedule
 
 
 def average_spec_qtd(nConnections, gamma, dataRates):
@@ -385,3 +246,222 @@ def average_spec_qtd(nConnections, gamma, dataRates):
     print("USEI %f ceil de %d" % (number_times, used_spec))
 
     return number_times
+
+
+def initialize():
+    if len(sys.argv) != 6:
+        print("argument error")
+        sys.exit(1)
+
+    load_overlap()
+    U_n = int(sys.argv[1])
+
+    receivers = [[0 for i in range(2)] for _ in range(U_n)]
+    senders = [[0 for i in range(2)] for _ in range(U_n)]
+    DR = [[0 for i in range(4)] for _ in range(12)]
+    SINR = [[0 for i in range(4)] for _ in range(12)]
+    AFF = [[0 for i in range(U_n)] for _ in range(U_n)]
+    DM = [[0 for i in range(U_n)] for _ in range(U_n)]
+    IM = [[0 for i in range(U_n)] for _ in range(U_n)]
+    gamma = [0 for i in range(U_n)]
+
+    inst = sys.argv[2]
+    p_type = "MD-VRBSP"
+    path = (
+        "../instances/md-vrbsp/U_"
+        + str(U_n)
+        + "/"
+        + p_type
+        + "_U_"
+        + str(U_n)
+        + "_"
+        + str(inst)
+        + ".txt"
+    )
+
+    print(path)
+
+    (NOI, PS, alfa, N, NTS, B) = read_instance(
+        path, receivers, senders, gamma, DR, SINR, IM, DM, AFF,
+    )
+
+    ans = 0
+    dic = {}
+    if int(sys.argv[4]) == 1:
+        ans = average_spec_qtd(N, gamma, DR)
+    elif int(sys.argv[4]) == 0:
+        ans, dic = read_from_file()
+        print("opa " + str(ans))
+    else:
+        print("invalid time-slot generator")
+        sys.exit(1)
+
+    # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
+    return N, 1, SINR, PS, NOI, B, IM, DM, AFF, DR
+
+
+def postProcess(m, x, I_, N, NTS, dic):
+    from gurobipy import GRB
+
+    if m.status == GRB.INFEASIBLE:
+        m.computeIIS()
+        m.write("conflict.ilp")
+
+    # m.write("sol.sol")
+    # file_ri = sys.argv[3] + "/result_information.txt"
+    # with open(file_ri, "a") as out_re:
+    #     out_re.write(str(sys.argv[2]) + " ")
+    #     for i in range(len(rst_headers) - 1):
+    #         out_re.write(str(m.getAttr(rst_headers[i])) + " ")
+    #     out_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
+    #     out_re.write("\n")
+    #
+    # m.write("solution.sol")
+    # file_name = sys.argv[3] + "/out-formatted" + str(sys.argv[2]) + ".txt"
+    # # conn, channel, MCS, interference
+    # with open(file_name, "a") as f:
+    #     f.write(str(m.objVal) + "\n")
+    #     for i in range(N):
+    #         for c in dic:
+    #             for t in range(NTS):
+    #                 if x[i, c, t].x == 1.0:
+    #                     f.write("%d %d %d %.12f\n" % (i, c, t, I_[i, t].x))
+
+
+def readFromFile(fp, x):
+    used_ch = []
+    seila = []
+    bw = seila[0]
+
+    t = -1
+    nList = seila[1]
+    c = -1
+    for bc in box_channels:
+        for c_ in bc:
+            if c_ in used_ch:
+                used_ch = used_ch + c_
+                c = c_
+                break
+
+    for i in nList:
+        x[i, c, t].start = 1.0
+
+
+def computeBigM(nConnections, interferenceMatrix, distanceMatrix, AFF):
+    ret = []
+    for i in range(nConnections):
+        value = 0.0
+        for j in range(nConnections):
+            if i != j:
+                value += AFF[j][i]
+
+        ret.append(value)
+
+    return ret
+
+
+def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
+    import gurobipy as gp
+    from os.path import isfile
+
+    try:
+        # 1st spec
+        # auxNC = [0, 1, 2, 3, 4, 5, 6, 7, 25, 26, 27, 28, 37, 38, 43]
+
+        # 3rd spec
+        # auxNC = [20, 21, 22, 23, 24, 35, 36, 42]
+
+        # 2nd spec
+        # auxNC = [
+        #     8,
+        #     9,
+        #     10,
+        #     11,
+        #     12,
+        #     13,
+        #     14,
+        #     15,
+        #     16,
+        #     17,
+        #     18,
+        #     19,
+        #     29,
+        #     30,
+        #     31,
+        #     32,
+        #     33,
+        #     34,
+        #     39,
+        #     40,
+        #     41,
+        #     44,
+        # ]
+
+        auxNC = [i for i in range(45)]
+
+        dicCH = {i: auxNC[i] for i in range(len(auxNC))}
+        m = gp.Model("raw model")
+        x, I_ = {}, {}
+
+        if sys.argv[5] == "mdvrbsp-bigm":
+            import mdvrbsp_bigm_imp2 as mdBig
+
+            BM = computeBigM(N, IM, DM, AFF)
+            print("CREATING MDVRBSP BIG-M MODEL")
+            m, x, I_ = mdBig.defineModel(
+                N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+            )
+        elif sys.argv[5] == "mdvrbsp-quad":
+            import mdvrbsp_quadvars_imp2 as mdQuad
+
+            print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
+            m, x, I_ = mdQuad.defineModel(N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx)
+        elif sys.argv[5] == "vrbsp-big":
+            import vrbsp_lin_impr as vrBig
+
+            print("TODO")
+            sys.exit(1)
+        elif sys.argv[5] == "vrbsp-quad":  # TODO
+            import vrbsp_xijc as vrTODO
+
+            print("TODO")
+            sys.exit(1)
+        else:
+            sys.exit(1)
+
+        if warm:
+            fp = (
+                "../vns/results/vrbsp/U_"
+                + str(N)
+                + "/solution"
+                + str(sys.argv[2])
+                + ".txt"
+            )
+            if not isfile(fp):
+                print("warm is true but there is no warm solution file")
+            else:
+                readFromFile(fp, x)
+
+        m.write(sys.argv[5] + ".lp")
+        file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
+        m.Params.logFile = file_log
+        # m.Params.logToConsole = 0
+        m.Params.timeLimit = 3600
+        m.Params.intFeasTol = 1e-5
+        m.Params.iisMethod = 1
+
+        m.optimize()
+
+        postProcess(m, x, I_, N, NTS, dicCH)
+
+    except gp.GurobiError as e:
+        print("Error code " + str(e.errno) + ": " + str(e))
+
+    except AttributeError:
+        print("Encountered an attribute error")
+
+
+if __name__ == "__main__":
+    N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR = initialize()
+    # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
+    opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR)
