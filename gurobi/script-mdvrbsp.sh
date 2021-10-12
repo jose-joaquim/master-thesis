@@ -4,7 +4,7 @@ lower=1
 upper=1
 for ((v=lower;v<=upper;v++));
 do
-    for inst in 16;
+    for inst in 64;
     do
         path_results="results/mdvrbsp-quad/U_"
         path_results_final=${path_results}${inst};

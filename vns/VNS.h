@@ -503,7 +503,7 @@ void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
 
 #ifdef MDVRBSP
     for_each(gma.begin(), gma.end(), [&file](double x) { fprintf(file, "%.4lf ", x); });
-    fprintf(file, "\n");
+    // fprintf(file, "\n");
 #endif
 
     fprintf(file, "\n%lf %d\n", sol.throughput, int(sol.slots.size()));

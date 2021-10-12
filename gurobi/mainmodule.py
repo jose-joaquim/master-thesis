@@ -214,11 +214,24 @@ def read_instance(
         # for i in range(len(gamma)):
         #     gamma[i] = aux_dr[secretsGen.choice(range(0, len(aux_dr)))]
 
+        path_gamma = (
+            "../vns/results/mdvrbsp/U_"
+            + str(nConnections)
+            + "/solution"
+            + str(sys.argv[2])
+            + ".txt"
+        )
+
+        with open(path_gamma) as f:
+            line = f.readline()
+            gamma = [float(p) for p in line.split()]
+
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
             for i in range(4):
                 beta[j][i] = gammaToBeta(gamma[j], dataRates, SINR, i)
 
+        time_slots = average_spec_qtd(nConnections, gamma, distanceMatrix)
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
 
@@ -284,19 +297,8 @@ def initialize():
         path, receivers, senders, gamma, DR, SINR, IM, DM, AFF,
     )
 
-    ans = 0
-    dic = {}
-    if int(sys.argv[4]) == 1:
-        ans = average_spec_qtd(N, gamma, DR)
-    elif int(sys.argv[4]) == 0:
-        ans, dic = read_from_file()
-        print("opa " + str(ans))
-    else:
-        print("invalid time-slot generator")
-        sys.exit(1)
-
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
-    return N, ans, SINR, PS, NOI, B, IM, DM, AFF, DR
+    return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR
 
 
 def postProcess(m, x, I_, N, NTS, dic):
@@ -323,10 +325,10 @@ def postProcess(m, x, I_, N, NTS, dic):
                         for c in dic:
                             for t in range(NTS):
                                 if x[i, c, t].x == 1.0:
-                                    f.write("%d %d %d %.12f\n" % (i, c, t, I_[i, t].x))
+                                    f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 
 
-def readFromFile(fp, x):
+def readFromFile(fp, x, NTS):
     used_ch = []
     seila = []
     bw = seila[0]
@@ -443,7 +445,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         m.write(sys.argv[5] + ".lp")
         file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
         m.Params.logFile = file_log
-        # m.Params.logToConsole = 0
+        m.Params.logToConsole = 0
         m.Params.timeLimit = 3600
         m.Params.intFeasTol = 1e-5
         m.Params.iisMethod = 1
