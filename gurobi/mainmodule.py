@@ -222,9 +222,14 @@ def read_instance(
             + ".txt"
         )
 
-        with open(path_gamma) as f:
-            line = f.readline()
-            gamma = [float(p) for p in line.split()]
+        from os.path import isfile
+
+        if isfile(path_gamma):
+            with open(path_gamma, "r") as f:
+                line = f.readline()
+                gamma = [float(p) for p in line.split()]
+        else:
+            print('warm file from vns solution not found!')
 
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
@@ -329,6 +334,19 @@ def postProcess(m, x, I_, N, NTS, dic):
 
 
 def readFromFile(fp, x, NTS):
+    with open(fp, "r") as f:
+        line = f.readline()
+        T, NTS = line.split()[0], line.split()[1]
+
+        for _ in range(NTS):
+            nsp = int(f.readline())
+            for _ in range(nsp):
+                nch = int(f.readline())
+                for _ in range(nch):
+                    line = f.readline().split()
+                    bw, nn = int(line[0]), int(line[1])
+                    # connections = [int(x) for x in line]
+
     used_ch = []
     seila = []
     bw = seila[0]
