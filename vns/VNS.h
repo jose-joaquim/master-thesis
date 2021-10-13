@@ -211,6 +211,7 @@ bool definitelyLessThan(double a, double b, double epsilon = EPS) {
 
 #ifdef MDVRBSP
 double computeViolation(Solution &sol) {
+#ifndef SUMVIO
     sol.violation = 0.0;
     for (TimeSlot &ts : sol.slots)
         for (Spectrum &sp : ts.spectrums)
@@ -218,12 +219,23 @@ double computeViolation(Solution &sol) {
                 double higher = 0.0;
                 for (const Connection &conn : ch.connections)
                     higher = max(higher, gma[conn.id] - conn.throughput);
-                // sol.violation = max(sol.violation, gma[conn.id] - conn.throughput);
 
                 ch.violation = higher;
                 sol.violation = max(sol.violation, ch.violation);
             }
+#else
+    sol.violation = 0.0;
+    for (TimeSlot &ts : sol.slots)
+        for (Spectrum &sp : ts.spectrums)
+            for (Channel &ch : sp.channels) {
+                double sum = 0.0;
+                for (const auto &conn : ch.connections)
+                    sum += max(0.0, gma[conn.id] - conn.throughput);
 
+                ch.violation = sum;
+                sol.violation += ch.violation;
+            }
+#endif
     return sol.violation;
 }
 

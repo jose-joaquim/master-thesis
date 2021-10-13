@@ -229,7 +229,7 @@ def read_instance(
                 line = f.readline()
                 gamma = [float(p) for p in line.split()]
         else:
-            print('warm file from vns solution not found!')
+            print("warm file from vns solution not found!")
 
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
@@ -468,8 +468,9 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         m.Params.intFeasTol = 1e-5
         m.Params.iisMethod = 1
 
-        m.optimize()
+        # m.printStats()
 
+        m.optimize()
         postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
