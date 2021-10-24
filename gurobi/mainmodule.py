@@ -468,10 +468,12 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         m.Params.intFeasTol = 1e-5
         m.Params.iisMethod = 1
 
+        m.write('model.lp')
+
         # m.printStats()
 
-        m.optimize()
-        postProcess(m, x, I_, N, NTS, dicCH)
+        # m.optimize()
+        # postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))

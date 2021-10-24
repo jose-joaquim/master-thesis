@@ -56,6 +56,97 @@ random_device rd;
 auto whatever = default_random_engine{rd()};
 static ti3 zeroChannel = {0, 3, 0};
 
+int overlap[45][45] = {{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                       {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+                        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1}};
+
 struct Connection {
     int id;
     double throughput;
@@ -138,10 +229,8 @@ class Solution {
     vector<TimeSlot> slots;
     double throughput;
     double violation;
-    bool throughput_flag;
 
-    Solution(const vector<Spectrum> sp, double tot, bool flag)
-        : throughput(tot), throughput_flag(flag) {
+    Solution(const vector<Spectrum> sp, double tot, bool flag) : throughput(tot) {
         slots.emplace_back(sp);
         violation = 0.0;
     }
@@ -149,14 +238,12 @@ class Solution {
     Solution(const vector<TimeSlot> &ts) : slots(ts) {
         throughput = 0.0;
         violation = 0.0;
-        throughput_flag = true;
     }
 
     Solution() {
         slots = vector<TimeSlot>();
         throughput = 0.0;
         violation = 0.0;
-        throughput_flag = true;
     }
 
 #ifdef MDVRBSP
@@ -254,6 +341,34 @@ void checkRepeat(const Channel &chan) {
 
         seen.insert(x.id);
     }
+}
+
+void rmvUnusedTS(Solution &sol) {
+    // TODO: TENHO QUE IGNORAR E NAO REMOVER O ZEROCHANNEL AQUI
+    set<int> rmv;
+    for (int t = 0; t < int(sol.slots.size()); t++) {
+        bool hasConn = false;
+        for (int s = 0; s < int(sol.slots[t].spectrums.size()); s++)
+            for (int c = 0; c < int(sol.slots[t].spectrums[s].channels.size()); c++)
+                if (make_tuple(t, s, c) == zeroChannel)
+                    continue;
+                else
+                    hasConn |= !sol.slots[t].spectrums[s].channels[c].connections.empty();
+
+        if (!hasConn)
+            rmv.insert(t);
+    }
+
+    Solution aux;
+    for (int t = 0; t < int(sol.slots.size()); t++)
+        if (rmv.count(t) == 0)
+            aux.slots.emplace_back(sol.slots[t]);
+
+    aux.violation = sol.violation;
+    aux.throughput = sol.throughput;
+
+    if (!rmv.empty())
+        printf("rmvUnusedTS removed %lu ts\n", rmv.size());
 }
 
 bool stop(void) { return (((double)(clock() - startTime)) / CLOCKS_PER_SEC) >= maximumTime; }
@@ -442,13 +557,13 @@ void read_data() {
 
 #ifdef MDVRBSP
     // Select random dataRates from the table
-    vector<double> aux;
-    for (int i = 0; i < int(dataRates.size()); i++)
-        for_each(dataRates[i].begin(), dataRates[i].end(),
-                 [&aux](double x) { aux.emplace_back(x); });
-
-    for (int i = 0; i < n_connections; i++)
-        gma[i] = aux[rng.randInt(aux.size() - 1)];
+    // vector<double> aux;
+    // for (int i = 0; i < int(dataRates.size()); i++)
+    //     for_each(dataRates[i].begin(), dataRates[i].end(),
+    //              [&aux](double x) { aux.emplace_back(x); });
+    //
+    // for (int i = 0; i < n_connections; i++)
+    //     gma[i] = aux[rng.randInt(aux.size() - 1)];
 
     beta.assign(n_connections, vector<double>(4, 0));
     for (int i = 0; i < n_connections; i++) {
@@ -475,38 +590,90 @@ void print_objective_to_file(const Solution &sol, FILE *file = nullptr) {
     fclose(file);
 }
 
+int bwIdx2(int x) {
+    if (x < 25)
+        return 0;
+    if (x < 37)
+        return 1;
+    if (x < 43)
+        return 2;
+
+    return 3;
+}
+
+int count_conn(const Solution &, bool op = false);
+
 void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
-    if (file == nullptr) {
-        file = fopen("./solution_gurobi.txt", "w");
-    }
+    assert(sol.slots[0].spectrums[3].channels[0].connections.empty());
+    if (file == nullptr)
+        file = fopen("./solution_gurobi.mst", "w");
 
-    fprintf(file, "%d\n", int(sol.slots.size()));
+    vector<set<int>> aux(4, set<int>());
+    for (int j = 0; j < 45; j++)
+        aux[bwIdx2(j)].insert(j);
 
-    for (const TimeSlot &ts : sol.slots) {
-        vector<string> lines;
-        for (const Spectrum &sp : ts.spectrums) {
-            for (const Channel &ch : sp.channels) {
-                if (ch.connections.empty())
+    int cnt = 0;
+    vector<pair<vector<int>, int>> S;
+    for (auto &ts : sol.slots)
+        for (auto &sp : ts.spectrums)
+            for (auto &ch : sp.channels) {
+                if (ch.bandwidth == 0)
                     continue;
+                
+                vector<int> conn_v;
+                for (auto &conn : ch.connections)
+                    conn_v.emplace_back(conn.id);
 
-                string line = to_string(ch.bandwidth) + " ";
-
-                for (int i = 0; i < ch.connections.size() - 1; i++) {
-                    line += (to_string(ch.connections[i].id) + " ");
-                }
-
-                line += to_string(ch.connections.back().id);
-                lines.emplace_back(line + "\n");
+                cnt += int(conn_v.size());
+                S.emplace_back(make_pair(conn_v, ch.bandwidth));
             }
+
+    sort(S.rbegin(), S.rend(),
+         [](const pair<vector<int>, int> &a, const pair<vector<int>, int> &b) {
+             return a.second < b.second;
+         });
+
+    int bw_cnt[] = {0, 0, 0, 0};
+
+    for (auto s : S)
+        ++bw_cnt[bwIdx(s.second)];
+
+    assert(cnt == n_connections);
+
+    vector<vector<set<int>>> T;
+    T.assign(sol.slots.size(), aux);
+
+    for (const auto &s : S) {
+        int bw = s.second;
+        int bw_idx = bwIdx(bw);
+
+        bool some = false;
+        for (int t_ = 0; t_ < int(T.size()); ++t_) {
+            bool found = false;
+            if (!T[t_][bw_idx].empty()) {
+                int ch_idx = *T[t_][bw_idx].begin();
+
+                for (const auto &c : s.first)
+                    fprintf(file, "x[%d,%d,%d] 1\n", c, ch_idx, t_);
+
+                for (int j = 0; j < 45; ++j)
+                    if (overlap[ch_idx][j] && T[t_][bwIdx2(j)].count(j))
+                        T[t_][bwIdx2(j)].erase(j);
+
+                --bw_cnt[bw_idx];
+                found = true;
+                some = true;
+            }
+
+            if (found)
+                break;
         }
 
-        fprintf(file, "%d\n", int(lines.size()));
-        for (const string &line : lines) {
-            fprintf(file, "%s", line.c_str());
-        }
+        assert(some);
     }
 
     fclose(file);
+    assert(count_conn(sol));
 }
 
 void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
@@ -537,10 +704,9 @@ void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
     fclose(file);
 }
 
-double computeConnectionThroughput(Connection &conn, int bandwidth, bool force = false) {
-    if (bandwidth == 0) {
+double computeConnectionThroughput(Connection &conn, int bandwidth) {
+    if (bandwidth == 0)
         return 0.0;
-    }
 
     int mcs = -1;
     int maxDataRate = 11;
@@ -555,9 +721,6 @@ double computeConnectionThroughput(Connection &conn, int bandwidth, bool force =
         mcs = 11;
         while (mcs >= 0 && conn_SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
             mcs--;
-
-        if (force)
-            printf("   ->> SINR EH %.10lf, MCS %d, BW %d\n", conn_SINR, mcs, bandwidth);
 
         if (mcs < 0)
             conn.throughput = 0.0;
@@ -660,7 +823,7 @@ double computeThroughput(Solution &curr, bool force = false) {
                         conn.interference += interferenceMatrix[conn.id][otherConn.id];
                     }
                     chThroughput += computeConnectionThroughput(
-                        conn, curr.slots[t].spectrums[s].channels[c].bandwidth, force);
+                        conn, curr.slots[t].spectrums[s].channels[c].bandwidth);
                 }
                 OF += chThroughput;
             }
@@ -668,7 +831,6 @@ double computeThroughput(Solution &curr, bool force = false) {
     }
 
     curr.throughput = OF;
-    curr.throughput_flag = true;
     return OF;
 }
 
@@ -713,7 +875,7 @@ void recoverSolution(int k, int i, int j, bool clean) {
     }
 }
 
-int count_conn(const Solution &sol, bool op = false) {
+int count_conn(const Solution &sol, bool op) {
     int ret = 0;
     // return 0;
 #ifdef MDVRBSP
@@ -740,7 +902,6 @@ int count_conn(const Solution &sol, bool op = false) {
         for (auto &x : sol.slots)
             for (auto &y : x.spectrums)
                 for (auto &z : y.channels)
-                    // if (z.bandwidth != 0)
                     for (auto &c : z.connections) {
                         ids.insert(c.id);
                         printf(" %d", c.id);
@@ -1311,37 +1472,6 @@ vector<Channel> split(Channel toSplit) {
     return ret;
 }
 
-void insertConnectionAt(int ts, int sp, int ch, int conn_id, Solution &curr) {}
-
-void remove_timeslot(Solution &curr) {
-    int ts_idx = -1;
-    double ts_inter = -1.0;
-    for (int t = 0; t < int(curr.slots.size()); t++) {
-        if (curr.slots[t].interference > ts_inter) {
-            ts_idx = t;
-            ts_inter = curr.slots[t].interference;
-        }
-    }
-
-    // Removo o time_slot
-    TimeSlot cp_ts(curr.slots[ts_idx]);
-    swap(curr.slots[ts_idx], curr.slots.back());
-    curr.slots.pop_back();
-
-    // Redestribuir conexoes
-    for (const Spectrum &sp : cp_ts.spectrums) {
-        for (const Channel &ch : sp.channels) {
-            for (const Connection &conn : ch.connections) {
-                int n_ts = rng.randInt(curr.slots.size());
-                int n_sp = rng.randInt(curr.slots[n_ts].spectrums.size());
-                int n_ch = rng.randInt(curr.slots[n_ts].spectrums[n_sp].channels.size());
-                // inserir conexao no local sorteado e re-computar throughput de todo mundo
-                insertConnectionAt(n_ts, n_sp, n_ch, conn.id, curr);
-            }
-        }
-    }
-}
-
 inline void perturbation(Solution &sol, int kkmul) {
 #ifndef MDVRBSP
     int rnd = rng.randInt(1);
@@ -1351,6 +1481,7 @@ inline void perturbation(Solution &sol, int kkmul) {
         K_RemoveAndInserts(sol, kkmul);
 
     fix_channels(sol);
+    rmvUnusedTS(sol);
 #else
     K_RemoveAndInserts(sol, kkmul);
 #endif
