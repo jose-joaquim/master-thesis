@@ -353,6 +353,9 @@ int main(int argc, char **argv) {
     FILE *file_out = fopen(path_out.c_str(), "w");
     print_solution_to_file(inc, file_out);
 
-    print_solution_to_gurobi(inc);
+    string mst_gurobi = string(argv[3]);
+    mst_gurobi += "/solution" + string(argv[2]) + ".mst";
+    FILE *file_mst = fopen(mst_gurobi.c_str(), "w");
+    print_solution_to_gurobi(inc, file_mst);
     return 0;
 }

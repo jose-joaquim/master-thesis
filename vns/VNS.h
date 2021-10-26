@@ -670,12 +670,7 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
 void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
     if (file == nullptr)
         file = fopen("./solution.txt", "w");
-
-#ifdef MDVRBSP
-    for_each(gma.begin(), gma.end(), [&file](double x) { fprintf(file, "%.4lf ", x); });
-    // fprintf(file, "\n");
-#endif
-
+    
     fprintf(file, "\n%lf %d\n", sol.throughput, int(sol.slots.size()));
     for (int t = 0; t < sol.slots.size(); t++) {
         fprintf(file, "%d\n", int(sol.slots[t].spectrums.size()));
