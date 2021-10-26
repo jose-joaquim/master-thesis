@@ -2,3 +2,6 @@
 .idea/
 **/results/
 **/bin/
+**/*.lp
+**/*.ilp
+**/*~
