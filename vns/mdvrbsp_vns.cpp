@@ -323,8 +323,8 @@ int main(int argc, char **argv) {
     }
 
     string path_input = "../instances/md-vrbsp/U_";
-    path_input += string(argv[1]);
-    path_input += "/MD-VRBSP_U_";
+    path_input += string(argv[1]) + "/U_";
+    // path_input += "/MD-VRBSP_U_";
     path_input += string(argv[1]);
     path_input += "_";
     path_input += string(argv[2]);

@@ -556,15 +556,6 @@ void read_data() {
     }
 
 #ifdef MDVRBSP
-    // Select random dataRates from the table
-    // vector<double> aux;
-    // for (int i = 0; i < int(dataRates.size()); i++)
-    //     for_each(dataRates[i].begin(), dataRates[i].end(),
-    //              [&aux](double x) { aux.emplace_back(x); });
-    //
-    // for (int i = 0; i < n_connections; i++)
-    //     gma[i] = aux[rng.randInt(aux.size() - 1)];
-
     beta.assign(n_connections, vector<double>(4, 0));
     for (int i = 0; i < n_connections; i++) {
 
