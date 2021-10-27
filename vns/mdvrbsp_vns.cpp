@@ -1,4 +1,3 @@
-// run 8 1 results/mdvrbsp/U_8 10
 #include "VNS.h"
 
 bool is_feasible(const Solution &ret, bool retOption = true) {
@@ -11,7 +10,7 @@ bool is_feasible(const Solution &ret, bool retOption = true) {
                     // printf("conn %d\n", conn.id);
                     cnt += 1;
                     scheduled.insert(conn.id);
-                    if (conn.throughput < gma[conn.id]) {
+                    if (definitelyLessThan(conn.throughput, gma[conn.id])) {
                         printf("ops... conn %d %lf %lf\n", conn.id, conn.throughput, gma[conn.id]);
                         return false;
                     }
@@ -19,6 +18,8 @@ bool is_feasible(const Solution &ret, bool retOption = true) {
             }
         }
     }
+
+    return true;
 
     if (cnt != n_connections) {
         for (auto x : scheduled)
@@ -36,20 +37,6 @@ bool is_feasible(const Solution &ret, bool retOption = true) {
     return cnt >= n_connections;
 }
 
-bool can_split(const Channel &ch) {
-    if (ch.bandwidth <= 40)
-        return false;
-
-    int new_bw = ch.bandwidth / 2;
-    for (const Connection &conn : ch.connections) {
-        if (gma[conn.id] > dataRates[11][bwIdx(new_bw)]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool try_insert(int conn_id, Channel &ch) {
     ch = insertInChannel(ch, conn_id);
 
@@ -60,7 +47,20 @@ bool try_insert(int conn_id, Channel &ch) {
     return true;
 }
 
-Solution constructive_heuristic(string filePrefix) {
+
+bool can_split(const Channel &ch) {
+    if (ch.bandwidth < 40)
+        return false;
+
+    Channel aux(ch.bandwidth / 2);
+    for (auto &conn : ch.connections)
+        if (!try_insert(conn.id, aux))
+            return false;
+
+    return true;
+}
+
+Solution constructive_heuristic(FILE* objImpF) {
     TimeSlot dummy_ts(init_conf);
     Solution ret({dummy_ts});
 
@@ -154,18 +154,21 @@ Solution constructive_heuristic(string filePrefix) {
                 }
             }
         }
+        computeThroughput(ret);
+        assert(is_feasible(ret));
     }
 
     vector<Channel> aux;
     aux.emplace_back(Channel());
     ret.slots[0].spectrums.emplace_back(0, 0, aux);
 
+    assert(is_feasible(ret));
+
     computeThroughput(ret);
 
-    if (!filePrefix.empty()) {
-        FILE *objFile = fopen(filePrefix.c_str(), "w");
-        fprintf(objFile, "%.3lf %lu\n", (clock() - startTime) / CLOCKS_PER_SEC, ret.slots.size());
-    }
+    if (objImpF != nullptr)
+        fprintf(objImpF, "%.3lf %lu\n", (clock() - startTime) / CLOCKS_PER_SEC, ret.slots.size());
+
     assert(is_feasible(ret));
     return ret;
 }
@@ -195,11 +198,7 @@ Solution delete_time_slot(const Solution &sol) {
     return ret;
 }
 
-Solution vns(Solution initial, string filePrefix) {
-    FILE *objImpFile = nullptr;
-    if (!filePrefix.empty())
-        objImpFile = fopen(filePrefix.c_str(), "a");
-
+Solution vns(Solution initial, FILE* objImpF) {
     Solution incumbent = initial;
     Solution delta = convertTo20MhzSol(initial);
     Solution local_min = delta;
@@ -245,8 +244,8 @@ Solution vns(Solution initial, string filePrefix) {
                 count_conn(explicit_sol);
                 double currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
 
-                if (objImpFile != nullptr)
-                    fprintf(objImpFile, "%lf %.2lf\n", currTime, local_min.violation);
+                if (objImpF != nullptr)
+                    fprintf(objImpF, "%lf %.2lf\n", currTime, local_min.violation);
 
                 first = false;
                 printf("%lf %.2lf %.2lf\n", currTime, local_min.violation, incumbent.violation);
@@ -270,7 +269,7 @@ Solution reductionHeuristic(char **argv) {
     FILE *objImpOut = fopen(objImp.c_str(), "w");
     assert(objImpOut != nullptr);
 
-    Solution S_star = constructive_heuristic(objImp);
+    Solution S_star = constructive_heuristic(objImpOut);
 
     // fprintf(objImpOut, "%.2lf %lu\n", 0.0, S_star.slots.size());
     if (S_star.slots.size() == 1) {
@@ -286,6 +285,7 @@ Solution reductionHeuristic(char **argv) {
         int cnt = 1;
         while (yFeasible(S1) && ++cnt && S1.slots.size() > 1LU) {
             double currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+            printf("written %lu in %s\n", S1.slots.size(), objImp.c_str());
             fprintf(objImpOut, "%.3lf %lu\n", currTime, S1.slots.size());
 
             S_star = S1;
@@ -297,7 +297,7 @@ Solution reductionHeuristic(char **argv) {
             return S1;
 
         printf("removed %d ts. Violation is now %lf\n", cnt, S1.violation);
-        S1 = vns(S1, string());
+        S1 = vns(S1, objImpOut);
 
         if (yFeasible(S1)) {
             count_conn(S1);
@@ -335,9 +335,10 @@ int main(int argc, char **argv) {
     // program_name, instance, version
     if (argc == 3) {
         puts("executing only constructive heuristic and printing results...");
-        Solution ch = constructive_heuristic(string()); // TODO
-        FILE *aux = fopen("../gurobi/warm.txt", "w");
-        print_solution(ch);
+        Solution ch = constructive_heuristic(nullptr);
+        printf("found solution with %lu time-slots\n", ch.slots.size());
+        FILE *aux = fopen("../gurobi/warm.mst", "w");
+        // print_solution(ch);
         print_solution_to_gurobi(ch, aux);
         return 0;
     }

@@ -20,9 +20,6 @@ def defineModel(N, NTS, BM, AFF, AUXNC, B, NOI, OVER, cToBIdx):
         return t, x, I_, Iij, z
 
     def constraints(t, x, I_, Iij, z):
-        # 0
-        m.addConstr(t.sum() >= 1, "force")
-
         # 1
         m.addConstrs((t[i + 1] <= t[i] for i in range(NTS - 1)), "ts")
 

@@ -33,7 +33,7 @@ static int n_connections, n_spectrums;
 static double alfa, noise, powerSender;
 static double receivers[MAX_CONN][2], senders[MAX_CONN][2];
 static double affectance[MAX_CONN][MAX_CONN];
-static double distanceMatrix[MAX_CONN][MAX_CONN], interferenceMatrix[MAX_CONN][MAX_CONN];
+static double distanceMatrix[MAX_CONN][MAX_CONN]; //, interferenceMatrix[MAX_CONN][MAX_CONN];
 static vector<vector<double>> dataRates, SINR, beta;
 static vector<int> spectrum_size;
 
@@ -344,7 +344,6 @@ void checkRepeat(const Channel &chan) {
 }
 
 void rmvUnusedTS(Solution &sol) {
-    // TODO: TENHO QUE IGNORAR E NAO REMOVER O ZEROCHANNEL AQUI
     set<int> rmv;
     for (int t = 0; t < int(sol.slots.size()); t++) {
         bool hasConn = false;
@@ -407,12 +406,12 @@ void distanceAndInterference() {
 
             distanceMatrix[i][j] = dist;
 
-            if (i == j) {
-                interferenceMatrix[i][j] = 0.0;
-            } else {
-                double value = (dist != 0.0) ? powerSender / pow(dist, alfa) : 1e9;
-                interferenceMatrix[i][j] = value;
-            }
+            // if (i == j) {
+            //     interferenceMatrix[i][j] = 0.0;
+            // } else {
+            //     double value = (dist != 0.0) ? powerSender / pow(dist, alfa) : 1e9;
+            //     interferenceMatrix[i][j] = value;
+            // }
         }
     }
 }
@@ -610,7 +609,7 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
             for (auto &ch : sp.channels) {
                 if (ch.bandwidth == 0)
                     continue;
-                
+
                 vector<int> conn_v;
                 for (auto &conn : ch.connections)
                     conn_v.emplace_back(conn.id);
@@ -633,6 +632,9 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
 
     vector<vector<set<int>>> T;
     T.assign(sol.slots.size(), aux);
+
+    for (int t = 0; t < int(sol.slots.size()); t++)
+        fprintf(file, "t[%d] 1\n", t);
 
     for (const auto &s : S) {
         int bw = s.second;
@@ -670,7 +672,7 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
 void print_solution_to_file(const Solution &sol, FILE *file = nullptr) {
     if (file == nullptr)
         file = fopen("./solution.txt", "w");
-    
+
     fprintf(file, "\n%lf %d\n", sol.throughput, int(sol.slots.size()));
     for (int t = 0; t < sol.slots.size(); t++) {
         fprintf(file, "%d\n", int(sol.slots[t].spectrums.size()));
@@ -701,11 +703,13 @@ double computeConnectionThroughput(Connection &conn, int bandwidth) {
         mcs = maxDataRate;
         conn.throughput = dataRates[mcs][bwIdx(bandwidth)];
     } else {
-        double conn_SINR = (powerSender / pow(conn.distanceSR, alfa)) / (conn.interference + noise);
-        conn.SINR = conn_SINR;
+        // double conn_SINR = (powerSender / pow(conn.distanceSR, alfa)) / (conn.interference +
+        // noise); conn.SINR = conn_SINR;
+
+        conn.SINR = affectance[conn.id][conn.id] / (conn.interference + noise);
 
         mcs = 11;
-        while (mcs >= 0 && conn_SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
+        while (mcs >= 0 && conn.SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
             mcs--;
 
         if (mcs < 0)
@@ -717,24 +721,26 @@ double computeConnectionThroughput(Connection &conn, int bandwidth) {
     return conn.throughput;
 }
 
-Channel insertInChannel(Channel newChannel, int idConn, bool zc = false) {
+Channel insertInChannel(Channel newChannel, int idConn) {
     Connection conn(idConn, 0.0, 0.0, distanceMatrix[idConn][idConn]);
 
     for (Connection &connection : newChannel.connections) {
-        connection.interference += interferenceMatrix[connection.id][conn.id];
-        conn.interference += interferenceMatrix[conn.id][connection.id];
+        // connection.interference += interferenceMatrix[connection.id][conn.id];
+        // conn.interference += interferenceMatrix[conn.id][connection.id];
+
+        connection.interference += affectance[connection.id][conn.id];
+        conn.interference += affectance[conn.id][connection.id];
     }
 
     newChannel.connections.emplace_back(conn);
     newChannel.throughput = 0.0;
+    newChannel.violation = 0.0;
     for (Connection &connection : newChannel.connections) {
-        if (!zc)
-            computeConnectionThroughput(connection, newChannel.bandwidth);
-
+        computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
+        newChannel.violation =
+            max(newChannel.violation, connection.throughput - gma[connection.id]);
     }
-
-    // checkRepeat(newChannel);
 
     return newChannel;
 }
@@ -749,10 +755,14 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
     }
 
     newChannel.throughput = 0.0;
+    newChannel.violation = 0.0;
     for (Connection &conn : newChannel.connections) {
-        conn.interference -= interferenceMatrix[conn.id][idConn];
+        // conn.interference -= interferenceMatrix[conn.id][idConn];
+        conn.interference -= affectance[conn.id][idConn];
+
         computeConnectionThroughput(conn, newChannel.bandwidth);
         newChannel.throughput += conn.throughput;
+        newChannel.violation = max(newChannel.violation, conn.throughput - gma[conn.id]);
     }
 
     return newChannel;
@@ -800,16 +810,16 @@ double computeThroughput(Solution &curr, bool force = false) {
             for (int c = 0; c < curr.slots[t].spectrums[s].channels.size(); c++) {
 
                 double &chThroughput = curr.slots[t].spectrums[s].channels[c].throughput;
+                int bw = curr.slots[t].spectrums[s].channels[c].bandwidth;
                 chThroughput = 0.0;
-                for (Connection &conn : curr.slots[t].spectrums[s].channels[c].connections) {
-                    conn.interference = 0.0;
-                    conn.throughput = 0.0;
-                    for (Connection &otherConn :
-                         curr.slots[t].spectrums[s].channels[c].connections) {
-                        conn.interference += interferenceMatrix[conn.id][otherConn.id];
-                    }
-                    chThroughput += computeConnectionThroughput(
-                        conn, curr.slots[t].spectrums[s].channels[c].bandwidth);
+                for (Connection &u : curr.slots[t].spectrums[s].channels[c].connections) {
+                    u.interference = 0.0;
+                    u.throughput = 0.0;
+                    for (Connection &v : curr.slots[t].spectrums[s].channels[c].connections)
+                        // conn.interference += interferenceMatrix[u.id][v.id];
+                        u.interference += u.id == v.id ? 0.0 : affectance[u.id][v.id];
+
+                    chThroughput += computeConnectionThroughput(u, bw);
                 }
                 OF += chThroughput;
             }
@@ -955,15 +965,12 @@ double computeObjective(Solution &sol) {
 }
 
 bool allChannels20MHz(const Solution &sol) {
-    for (const TimeSlot &ts : sol.slots) {
-        for (const Spectrum &spectrum : ts.spectrums) {
-            for (const Channel &channel : spectrum.channels) {
-                if (channel.bandwidth > 20) {
+    for (const TimeSlot &ts : sol.slots)
+        for (const Spectrum &spectrum : ts.spectrums)
+            for (const Channel &channel : spectrum.channels)
+                if (channel.bandwidth > 20)
                     return false;
-                }
-            }
-        }
-    }
+
     return true;
 }
 
@@ -1109,8 +1116,6 @@ void K_AddDrop(Solution &sol, int K) {
 
         reinsert(sol, conn, channelFrom, channelTo, true);
     }
-
-    // count_conn(sol);
 }
 
 void K_RemoveAndInserts(Solution &sol, int K) {

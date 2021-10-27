@@ -183,7 +183,6 @@ def read_instance(
 
             for j in range(4):
                 dataRates[i][j] = float(aux[j])
-                aux_dr.append(dataRates[i][j])
 
         f.readline()
         for i in range(12):
@@ -210,38 +209,18 @@ def read_instance(
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 AFF[i][j] = value
 
-        # secretsGen = secrets.SystemRandom()
-        # for i in range(len(gamma)):
-        #     gamma[i] = aux_dr[secretsGen.choice(range(0, len(aux_dr)))]
-
-        path_gamma = (
-            "../vns/results/mdvrbsp/U_"
-            + str(nConnections)
-            + "/solution"
-            + str(sys.argv[2])
-            + ".txt"
-        )
-
-        from os.path import isfile
-
-        if isfile(path_gamma):
-            with open(path_gamma, "r") as f:
-                line = f.readline()
-                gamma = [float(p) for p in line.split()]
-        else:
-            print("warm file from vns solution not found!")
-
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
             for i in range(4):
                 beta[j][i] = gammaToBeta(gamma[j], dataRates, SINR, i)
 
-        time_slots = average_spec_qtd(nConnections, gamma, distanceMatrix)
+        time_slots = average_spec_qtd(nConnections, gamma, dataRates)
         return noise, powerSender, alfa, nConnections, time_slots, beta
 
 
 def average_spec_qtd(nConnections, gamma, dataRates):
     used_spec = 0
+
     for i in range(nConnections):
         bw = 0
         for j in range(4):
@@ -283,13 +262,13 @@ def initialize():
     gamma = [0 for i in range(U_n)]
 
     inst = sys.argv[2]
-    p_type = "MD-VRBSP"
+    # p_type = "MD-VRBSP"
     path = (
         "../instances/md-vrbsp/U_"
         + str(U_n)
         + "/"
-        + p_type
-        + "_U_"
+        # + p_type
+        + "U_"
         + str(U_n)
         + "_"
         + str(inst)
@@ -331,38 +310,6 @@ def postProcess(m, x, I_, N, NTS, dic):
                             for t in range(NTS):
                                 if x[i, c, t].x == 1.0:
                                     f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
-
-
-def readFromFile(fp, x, NTS):
-    with open(fp, "r") as f:
-        line = f.readline()
-        T, NTS = line.split()[0], line.split()[1]
-
-        for _ in range(NTS):
-            nsp = int(f.readline())
-            for _ in range(nsp):
-                nch = int(f.readline())
-                for _ in range(nch):
-                    line = f.readline().split()
-                    bw, nn = int(line[0]), int(line[1])
-                    # connections = [int(x) for x in line]
-
-    used_ch = []
-    seila = []
-    bw = seila[0]
-
-    t = -1
-    nList = seila[1]
-    c = -1
-    for bc in box_channels:
-        for c_ in bc:
-            if c_ in used_ch:
-                used_ch = used_ch + c_
-                c = c_
-                break
-
-    for i in nList:
-        x[i, c, t].start = 1.0
 
 
 def computeBigM(nConnections, interferenceMatrix, distanceMatrix, AFF):
@@ -427,7 +374,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
             BM = computeBigM(N, IM, DM, AFF)
             print("CREATING MDVRBSP BIG-M MODEL")
             m, x, I_ = mdBig.defineModel(
-                N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+                N, 4, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
             )
         elif sys.argv[5] == "mdvrbsp-quad":
             import mdvrbsp_quadvars_imp2 as mdQuad
@@ -447,32 +394,26 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         else:
             sys.exit(1)
 
-        if warm:
-            fp = (
-                "../vns/results/vrbsp/U_"
-                + str(N)
-                + "/solution"
-                + str(sys.argv[2])
-                + ".txt"
-            )
-            if not isfile(fp):
-                print("warm is true but there is no warm solution file")
-            else:
-                readFromFile(fp, x)
+        # m.write(sys.argv[5] + ".lp")
+        # file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
+        # m.Params.logFile = file_log
+        # m.Params.logToConsole = 0
+        # m.Params.timeLimit = 3600
+        # m.Params.intFeasTol = 1e-5
+        # m.Params.iisMethod = 1
 
-        m.write(sys.argv[5] + ".lp")
-        file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
-        m.Params.logFile = file_log
-        m.Params.logToConsole = 0
-        m.Params.timeLimit = 3600
-        m.Params.intFeasTol = 1e-5
-        m.Params.iisMethod = 1
+        m.write("model1.lp")
 
-        m.write('model.lp')
+        if isfile("./warm.mst"):
+            with open("./warm.mst", "r") as sol:
+                for line in sol:
+                    arr = line.split()
+                    m.getVarByName(arr[0]).ub = float(arr[1])
+                    m.getVarByName(arr[0]).lb = float(arr[1])
 
-        # m.printStats()
+                m.write("model2.lp")
 
-        # m.optimize()
+        m.optimize()
         # postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
