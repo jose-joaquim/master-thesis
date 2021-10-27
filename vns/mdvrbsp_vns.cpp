@@ -69,7 +69,9 @@ Solution constructive_heuristic(FILE* objImpF) {
         links.emplace_back(i);
 
     shuffle(links.begin(), links.end(), whatever);
+    int cnt = 0;
     for (int conn : links) {
+        ++cnt;
         bool success = false;
         for (int t = 0; t < ret.slots.size(); t++) {
             for (int s = 0; s < ret.slots[t].spectrums.size(); s++) {

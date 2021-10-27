@@ -47,10 +47,11 @@ datas = [
 ]
 
 for u in U:
+    print(u[2:])
     inst = -1
     L = [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
     for i in L:
-        if str(i) in u:
+        if str(i) == u[2:]:
             inst = i
             break
 
