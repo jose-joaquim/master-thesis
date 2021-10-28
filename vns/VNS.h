@@ -709,7 +709,7 @@ double computeConnectionThroughput(Connection &conn, int bandwidth) {
         conn.SINR = affectance[conn.id][conn.id] / (conn.interference + noise);
 
         mcs = 11;
-        while (mcs >= 0 && conn.SINR < SINR[mcs][bwIdx(bandwidth)]) // TODO: be careful here
+        while (mcs >= 0 && conn.SINR < SINR[mcs][bwIdx(bandwidth)])
             mcs--;
 
         if (mcs < 0)
@@ -738,8 +738,12 @@ Channel insertInChannel(Channel newChannel, int idConn) {
     for (Connection &connection : newChannel.connections) {
         computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
+#ifdef SUMVIO
+        newChannel.violation += max(0.0, connection.thoughput, gma[connection.id]);
+#else
         newChannel.violation =
             max(newChannel.violation, connection.throughput - gma[connection.id]);
+#endif
     }
 
     return newChannel;
@@ -762,7 +766,11 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
 
         computeConnectionThroughput(conn, newChannel.bandwidth);
         newChannel.throughput += conn.throughput;
+#ifdef SUMVIO
+        newChannel.violation += max(0.0, connection.thoughput, gma[connection.id]);
+#else
         newChannel.violation = max(newChannel.violation, conn.throughput - gma[conn.id]);
+#endif
     }
 
     return newChannel;
