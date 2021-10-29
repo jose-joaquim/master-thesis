@@ -47,7 +47,6 @@ bool try_insert(int conn_id, Channel &ch) {
     return true;
 }
 
-
 bool can_split(const Channel &ch) {
     if (ch.bandwidth < 40)
         return false;
@@ -60,18 +59,40 @@ bool can_split(const Channel &ch) {
     return true;
 }
 
-Solution constructive_heuristic(FILE* objImpF) {
+Solution constructive_heuristic(FILE *objImpF) {
     TimeSlot dummy_ts(init_conf);
     Solution ret({dummy_ts});
 
     vector<int> links;
+#ifdef CH_GREEDY
+    puts("heuristic sort by affectance");
+    vector<pair<double, int>> bigm(n_connections, make_pair(0.0, 0));
+    for (int i = 0; i < int(bigm.size()); i++) {
+        bigm[i] = make_pair(accumulate(affectance[i], affectance[i] + n_connections, 0.0), i);
+        bigm[i].first -= affectance[i].first;
+    }
+
+    sort(bigm.begin(), bigm.end());
+    for (int i = 0; i < n_connections; i++)
+        links.emplace_back(bigm[i].second);
+#elif CH_GREATERGAMMA
+    puts("heuristic sort by gamma");
+    vector<pair<double, int>> gamma_or(n_connections, make_pair(0.0, 0));
+    for (int i = 0; i < int(gamma_or.size()); i++)
+        gamma_or[i] = make_pair(gma[i], i);
+
+    sort(gamma_or.begin(), gamma_or.end());
+    for (int i = 0; i < n_connections; i++)
+        links.emplace_back(gamma_or[i].second);
+#else
+    puts("heuristic sort randomly");
     for (int i = 0; i < n_connections; i++)
         links.emplace_back(i);
 
     shuffle(links.begin(), links.end(), whatever);
-    int cnt = 0;
+#endif
+
     for (int conn : links) {
-        ++cnt;
         bool success = false;
         for (int t = 0; t < ret.slots.size(); t++) {
             for (int s = 0; s < ret.slots[t].spectrums.size(); s++) {
@@ -200,7 +221,7 @@ Solution delete_time_slot(const Solution &sol) {
     return ret;
 }
 
-Solution vns(Solution initial, FILE* objImpF) {
+Solution vns(Solution initial, FILE *objImpF) {
     Solution incumbent = initial;
     Solution delta = convertTo20MhzSol(initial);
     Solution local_min = delta;

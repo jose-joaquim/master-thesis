@@ -10,13 +10,6 @@ double maximumTime;
 
 // variante, tempo limite, criterio de parada, objectiveFile, solutionFile, instanciaFile
 void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objectivesFile = nullptr) {
-#ifdef DEBUG_CLION // TODO: remind to remove the MACRO before real tests
-    puts("============== WITH DEBUG ==============");
-    freopen("/Users/joaquimnt_/git/vrbspheuristics/Instancias/D250x250/U_2048/U_2048_1.txt", "r",
-            stdin);
-
-    maximumTime = 10;
-#else
     if (argc != 5) {
         fprintf(stderr,
                 "wrong arguments. Provided %d, Must be: stdin, solutionFile, objectiveFile, "
@@ -44,7 +37,6 @@ void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objective
     }
 
     maximumTime = stoi(argv[4]);
-#endif
 
     if (stdin == nullptr) {
         fprintf(stderr, "error opening input file (stdin)\n");
@@ -55,11 +47,7 @@ void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objective
     populationSize = 100;
     numberVariables = 2 * nConnections;
 
-#ifdef DEBUG_CLION
-    fprintf(stdout, "[BRKGA] will execute for %lf seconds\n", maximumTime);
-#else
     fprintf(stdout, "[BRKGA variant %s] will execute for %lf seconds\n", argv[5], maximumTime);
-#endif
 }
 
 int main(int argc, char **argv) {
@@ -123,15 +111,6 @@ int main(int argc, char **argv) {
 
     TempoExecTotal = (((double)(clock() - TempoFO_StarInic)) / CLOCKS_PER_SEC);
 
-#ifdef DEBUG_CLION
-    printf("%lf\n", algorithm.getBestFitness());
-    vector<double> aux = algorithm.getBestChromosome();
-    for (int i = 0; i < aux.size(); i++) {
-        printf("%lf ", aux[i]);
-    }
-    puts("");
-    assert(algorithm.getBestFitness() == decoder.decode(aux));
-#else
     if (solutionFile != nullptr) {
         vector<double> best = algorithm.getBestChromosome();
         for (int i = 0; i < best.size(); i++) {
@@ -152,6 +131,5 @@ int main(int argc, char **argv) {
 
     fclose(solutionFile);
     fclose(objectivesFile);
-#endif
     return 0;
 }
