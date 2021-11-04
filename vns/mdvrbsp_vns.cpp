@@ -64,33 +64,37 @@ Solution constructive_heuristic(FILE *objImpF) {
     Solution ret({dummy_ts});
 
     vector<int> links;
-#ifdef CH_GREEDY
-    puts("heuristic sort by affectance");
-    vector<pair<double, int>> bigm(n_connections, make_pair(0.0, 0));
-    for (int i = 0; i < int(bigm.size()); i++) {
-        bigm[i] = make_pair(accumulate(affectance[i], affectance[i] + n_connections, 0.0), i);
-        bigm[i].first -= affectance[i].first;
+    switch (ch_opt) {
+    case MIN_GAMMA: // TODO
+    case MINIMUM_AFF: {
+        puts("heuristic sort by gamma");
+        vector<pair<double, int>> gamma_or(n_connections, make_pair(0.0, 0));
+        for (int i = 0; i < int(gamma_or.size()); i++)
+            gamma_or[i] = make_pair(gma[i], i);
+
+        sort(gamma_or.begin(), gamma_or.end());
+        for (int i = 0; i < n_connections; i++)
+            links.emplace_back(gamma_or[i].second);
+    } break;
+    case GREEDY: {
+        puts("heuristic sort by affectance");
+        vector<pair<double, int>> bigm(n_connections, make_pair(0.0, 0));
+        for (int i = 0; i < int(bigm.size()); i++) {
+            bigm[i] = make_pair(accumulate(affectance[i], affectance[i] + n_connections, 0.0), i);
+            bigm[i].first -= affectance[i][i];
+        }
+
+        sort(bigm.begin(), bigm.end());
+        for (int i = 0; i < n_connections; i++)
+            links.emplace_back(bigm[i].second);
+    } break;
+    default:
+        puts("heuristic sort randomly");
+        for (int i = 0; i < n_connections; i++)
+            links.emplace_back(i);
+
+        shuffle(links.begin(), links.end(), whatever);
     }
-
-    sort(bigm.begin(), bigm.end());
-    for (int i = 0; i < n_connections; i++)
-        links.emplace_back(bigm[i].second);
-#elif CH_GREATERGAMMA
-    puts("heuristic sort by gamma");
-    vector<pair<double, int>> gamma_or(n_connections, make_pair(0.0, 0));
-    for (int i = 0; i < int(gamma_or.size()); i++)
-        gamma_or[i] = make_pair(gma[i], i);
-
-    sort(gamma_or.begin(), gamma_or.end());
-    for (int i = 0; i < n_connections; i++)
-        links.emplace_back(gamma_or[i].second);
-#else
-    puts("heuristic sort randomly");
-    for (int i = 0; i < n_connections; i++)
-        links.emplace_back(i);
-
-    shuffle(links.begin(), links.end(), whatever);
-#endif
 
     for (int conn : links) {
         bool success = false;
@@ -103,11 +107,6 @@ Solution constructive_heuristic(FILE *objImpF) {
                     if (make_tuple(t, s, c) == zeroChannel)
                         continue;
 
-                    // 1. Tentar inserir no canal c
-                    //    - sucesso: break
-                    //    - falha: verificar se eh possivel split(c)
-                    //       - se sim, tentar inserir em split(c)
-                    //       - sucesso: break
                     if (success)
                         break;
 
@@ -185,8 +184,6 @@ Solution constructive_heuristic(FILE *objImpF) {
     aux.emplace_back(Channel());
     ret.slots[0].spectrums.emplace_back(0, 0, aux);
 
-    assert(is_feasible(ret));
-
     computeThroughput(ret);
 
     if (objImpF != nullptr)
@@ -230,9 +227,11 @@ Solution vns(Solution initial, FILE *objImpF) {
     int K_MAX = min(n_connections, 10);
     bool first = true;
 
+    int iter = 0;
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
+            ++iter;
             assert(delta.slots[0].spectrums[3].channels[0].connections.empty());
             delta = local_min;
 
@@ -267,8 +266,8 @@ Solution vns(Solution initial, FILE *objImpF) {
                 count_conn(explicit_sol);
                 double currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
 
-                if (objImpF != nullptr)
-                    fprintf(objImpF, "%lf %.2lf\n", currTime, local_min.violation);
+                // if (objImpF != nullptr)
+                //     fprintf(objImpF, "%lf %.2lf\n", currTime, local_min.violation);
 
                 first = false;
                 printf("%lf %.2lf %.2lf\n", currTime, local_min.violation, incumbent.violation);
@@ -294,7 +293,6 @@ Solution reductionHeuristic(char **argv) {
 
     Solution S_star = constructive_heuristic(objImpOut);
 
-    // fprintf(objImpOut, "%.2lf %lu\n", 0.0, S_star.slots.size());
     if (S_star.slots.size() == 1) {
         assert(yFeasible(S_star));
         printf("Constructive heuristic found feasible solution with only one time-slots.\n");
@@ -339,12 +337,61 @@ Solution reductionHeuristic(char **argv) {
     return S_star;
 }
 
-int main(int argc, char **argv) {
-    if (argc != 3 && argc != 5) {
-        puts("argument error");
-        return 1;
-    }
+enum CH_PARAMS define_chParam(string arg) {
+    if (arg == "GREEDY")
+        return GREEDY;
+    else if (arg == "MIN_GAMMA")
+        return MIN_GAMMA;
+    else if (arg == "MINIMUM_AFF")
+        return MINIMUM_AFF;
 
+    return RANDOM;
+}
+
+enum OF_TYPE define_ofParam(string arg) {
+    if (arg == "MINMAX")
+        return MINMAX;
+
+    return SUMVIO;
+}
+
+void read_params(char *path) {
+    FILE *fp = fopen(path, "r");
+
+    if (fp != nullptr) {
+        char arg[100], val[10];
+        while (fscanf(fp, "%s %s", arg, val) != EOF) {
+            cout << arg << " - " << val << endl;
+            string s_arg(arg), s_val(val);
+            if (s_arg == "OF_TYPE")
+                of_opt = define_ofParam(s_arg);
+            else if (s_arg == "CH_PARAMS")
+                ch_opt = define_chParam(s_arg);
+        }
+
+        fclose(fp);
+        fp = nullptr;
+    } else
+        puts("could not open params file!");
+}
+
+void solution_gurobi(const Solution &inc, char **argv) {
+    string mst_gurobi = string(argv[3]);
+    mst_gurobi += "/solution" + string(argv[2]) + ".mst";
+    FILE *file_mst = fopen(mst_gurobi.c_str(), "w");
+    print_solution_to_gurobi(inc, file_mst);
+}
+
+void solution_file(const Solution &inc, char **argv) {
+    string path_out = string(argv[3]);
+    path_out += "/solution" + string(argv[2]);
+    path_out += ".txt";
+    cout << path_out << endl;
+    FILE *file_out = fopen(path_out.c_str(), "w");
+    print_solution_to_file(inc, file_out);
+}
+
+int main(int argc, char **argv) {
     string path_input = "../instances/md-vrbsp/U_";
     path_input += string(argv[1]) + "/U_";
     // path_input += "/MD-VRBSP_U_";
@@ -352,8 +399,18 @@ int main(int argc, char **argv) {
     path_input += "_";
     path_input += string(argv[2]);
     path_input += ".txt";
+    puts(path_input.c_str());
     freopen(path_input.c_str(), "r", stdin);
     read_data();
+
+    if (argc == 6) {
+        puts("reading parameters from file...");
+        read_params(argv[5]);
+    } else {
+        puts("setting default parameters");
+        ch_opt = GREEDY;
+        of_opt = MINMAX;
+    }
 
     // program_name, instance, version
     if (argc == 3) {
@@ -361,25 +418,19 @@ int main(int argc, char **argv) {
         Solution ch = constructive_heuristic(nullptr);
         printf("found solution with %lu time-slots\n", ch.slots.size());
         FILE *aux = fopen("../gurobi/warm.mst", "w");
-        // print_solution(ch);
+
         print_solution_to_gurobi(ch, aux);
         return 0;
+    } else if (argc == 7) {
+        puts("setting parameters from the program arguments");
+        of_opt = define_ofParam(string(argv[5]));
+        ch_opt = define_chParam(string(argv[6]));
     }
 
     maximumTime = stoi(argv[4]) * 1.0;
     Solution inc = reductionHeuristic(argv);
-    // print_solution(inc);
 
-    string path_out = string(argv[3]);
-    path_out += "/solution" + string(argv[2]);
-    path_out += ".txt";
-    cout << path_out << endl;
-    FILE *file_out = fopen(path_out.c_str(), "w");
-    print_solution_to_file(inc, file_out);
-
-    string mst_gurobi = string(argv[3]);
-    mst_gurobi += "/solution" + string(argv[2]) + ".mst";
-    FILE *file_mst = fopen(mst_gurobi.c_str(), "w");
-    print_solution_to_gurobi(inc, file_mst);
+    solution_file(inc, argv);
+    solution_gurobi(inc, argv);
     return 0;
 }

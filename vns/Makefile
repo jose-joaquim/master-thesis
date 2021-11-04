@@ -6,9 +6,3 @@ vrbsp:
 
 mdvrbsp:
 	g++ -Wall -DMDVRBSP -g -std=c++11 mdvrbsp_vns.cpp -o mdvrbsp_vns
-
-vrcheck:
-	g++ -std=c++11 -o check feasibility_check.cpp
-
-mdcheck:
-	g++ -D MDVRBSP -std=c++11 -o check feasibility_check.cpp

@@ -24,6 +24,11 @@ const double EPS = 1e-9;
 
 using namespace std;
 
+enum CH_PARAMS { RANDOM, GREEDY, MIN_GAMMA, MINIMUM_AFF };
+#ifdef MDVRBSP
+enum OF_TYPE { MINMAX, SUMVIO };
+#endif
+
 using ii = pair<int, int>;
 using dd = pair<double, double>;
 using ti3 = tuple<int, int, int>;
@@ -47,6 +52,8 @@ static int parent[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static int child[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS][2];
 static double chanOF[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static bool inSolution[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
+static CH_PARAMS ch_opt;
+static OF_TYPE of_opt;
 
 #ifdef MDVRBSP
 static vector<double> gma;
@@ -216,7 +223,9 @@ struct TimeSlot {
     double interference;
     double throughput;
 
-    TimeSlot(const vector<Spectrum> sp) : spectrums(sp) {}
+    TimeSlot(const vector<Spectrum> sp) : TimeSlot() {
+        spectrums = sp;
+    }
     TimeSlot() {
         interference = 0.0;
         throughput = 0.0;
@@ -298,31 +307,31 @@ bool definitelyLessThan(double a, double b, double epsilon = EPS) {
 
 #ifdef MDVRBSP
 double computeViolation(Solution &sol) {
-#ifndef SUMVIO
-    sol.violation = 0.0;
-    for (TimeSlot &ts : sol.slots)
-        for (Spectrum &sp : ts.spectrums)
-            for (Channel &ch : sp.channels) {
-                double higher = 0.0;
-                for (const Connection &conn : ch.connections)
-                    higher = max(higher, gma[conn.id] - conn.throughput);
+    if (of_opt == SUMVIO) {
+        sol.violation = 0.0;
+        for (TimeSlot &ts : sol.slots)
+            for (Spectrum &sp : ts.spectrums)
+                for (Channel &ch : sp.channels) {
+                    double higher = 0.0;
+                    for (const Connection &conn : ch.connections)
+                        higher = max(higher, gma[conn.id] - conn.throughput);
 
-                ch.violation = higher;
-                sol.violation = max(sol.violation, ch.violation);
-            }
-#else
-    sol.violation = 0.0;
-    for (TimeSlot &ts : sol.slots)
-        for (Spectrum &sp : ts.spectrums)
-            for (Channel &ch : sp.channels) {
-                double sum = 0.0;
-                for (const auto &conn : ch.connections)
-                    sum += max(0.0, gma[conn.id] - conn.throughput);
+                    ch.violation = higher;
+                    sol.violation = max(sol.violation, ch.violation);
+                }
+    } else {
+        sol.violation = 0.0;
+        for (TimeSlot &ts : sol.slots)
+            for (Spectrum &sp : ts.spectrums)
+                for (Channel &ch : sp.channels) {
+                    double sum = 0.0;
+                    for (const auto &conn : ch.connections)
+                        sum += max(0.0, gma[conn.id] - conn.throughput);
 
-                ch.violation = sum;
-                sol.violation += ch.violation;
-            }
-#endif
+                    ch.violation = sum;
+                    sol.violation += ch.violation;
+                }
+    }
     return sol.violation;
 }
 
@@ -394,24 +403,15 @@ void convertTableToMW(const vector<vector<double>> &_SINR, vector<vector<double>
 
 void distanceAndInterference() {
     for (int i = 0; i < n_connections; i++) {
-        double X_si = receivers[i][X_c];
-        double Y_si = receivers[i][Y_c];
+        double sender_i_x = senders[i][0];
+        double sender_i_y = senders[i][1];
 
         for (int j = 0; j < n_connections; j++) {
+            double receiver_j_x = receivers[j][0];
+            double receiver_j_y = receivers[j][1];
 
-            double X_rj = senders[j][X_c];
-            double Y_rj = senders[j][Y_c];
-
-            double dist = distance(X_si, Y_si, X_rj, Y_rj);
-
+            double dist = distance(sender_i_x, sender_i_y, receiver_j_x, receiver_j_y);
             distanceMatrix[i][j] = dist;
-
-            // if (i == j) {
-            //     interferenceMatrix[i][j] = 0.0;
-            // } else {
-            //     double value = (dist != 0.0) ? powerSender / pow(dist, alfa) : 1e9;
-            //     interferenceMatrix[i][j] = value;
-            // }
         }
     }
 }
@@ -630,6 +630,8 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
 
     assert(cnt == n_connections);
 
+    fprintf(file, "# %lu\n", sol.slots.size());
+
     vector<vector<set<int>>> T;
     T.assign(sol.slots.size(), aux);
 
@@ -666,6 +668,7 @@ void print_solution_to_gurobi(const Solution &sol, FILE *file = nullptr) {
     }
 
     fclose(file);
+    file = nullptr;
     assert(count_conn(sol));
 }
 
@@ -721,15 +724,12 @@ double computeConnectionThroughput(Connection &conn, int bandwidth) {
     return conn.throughput;
 }
 
-Channel insertInChannel(Channel newChannel, int idConn) {
+Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
     Connection conn(idConn, 0.0, 0.0, distanceMatrix[idConn][idConn]);
 
     for (Connection &connection : newChannel.connections) {
-        // connection.interference += interferenceMatrix[connection.id][conn.id];
-        // conn.interference += interferenceMatrix[conn.id][connection.id];
-
-        connection.interference += affectance[connection.id][conn.id];
-        conn.interference += affectance[conn.id][connection.id];
+        connection.interference += affectance[connection.id][idConn];
+        conn.interference += affectance[idConn][connection.id];
     }
 
     newChannel.connections.emplace_back(conn);
@@ -739,10 +739,10 @@ Channel insertInChannel(Channel newChannel, int idConn) {
         computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
 #ifdef SUMVIO
-        newChannel.violation += max(0.0, connection.thoughput, gma[connection.id]);
+        newChannel.violation += max(0.0, gma[connection.id] - connection.throughput);
 #else
         newChannel.violation =
-            max(newChannel.violation, connection.throughput - gma[connection.id]);
+            max(newChannel.violation, gma[connection.id] - connection.throughput);
 #endif
     }
 
@@ -752,24 +752,21 @@ Channel insertInChannel(Channel newChannel, int idConn) {
 Channel deleteFromChannel(const Channel &channel, int idConn) {
     Channel newChannel(channel.bandwidth);
 
-    for (const Connection &conn : channel.connections) {
-        if (conn.id != idConn) {
+    for (const Connection &conn : channel.connections)
+        if (conn.id != idConn)
             newChannel.connections.emplace_back(conn);
-        }
-    }
 
     newChannel.throughput = 0.0;
     newChannel.violation = 0.0;
     for (Connection &conn : newChannel.connections) {
-        // conn.interference -= interferenceMatrix[conn.id][idConn];
         conn.interference -= affectance[conn.id][idConn];
 
         computeConnectionThroughput(conn, newChannel.bandwidth);
         newChannel.throughput += conn.throughput;
 #ifdef SUMVIO
-        newChannel.violation += max(0.0, connection.thoughput, gma[connection.id]);
+        newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
 #else
-        newChannel.violation = max(newChannel.violation, conn.throughput - gma[conn.id]);
+        newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
 #endif
     }
 
@@ -816,20 +813,20 @@ double computeThroughput(Solution &curr, bool force = false) {
     for (int t = 0; t < curr.slots.size(); t++) {
         for (int s = 0; s < curr.slots[t].spectrums.size(); s++) {
             for (int c = 0; c < curr.slots[t].spectrums[s].channels.size(); c++) {
+                if (make_tuple(t, s, c) == zeroChannel)
+                    continue;
 
-                double &chThroughput = curr.slots[t].spectrums[s].channels[c].throughput;
-                int bw = curr.slots[t].spectrums[s].channels[c].bandwidth;
-                chThroughput = 0.0;
-                for (Connection &u : curr.slots[t].spectrums[s].channels[c].connections) {
+                auto &chan = curr.slots[t].spectrums[s].channels[c];
+                chan.throughput = 0.0;
+                for (Connection &u : chan.connections) {
                     u.interference = 0.0;
                     u.throughput = 0.0;
-                    for (Connection &v : curr.slots[t].spectrums[s].channels[c].connections)
-                        // conn.interference += interferenceMatrix[u.id][v.id];
+                    for (Connection &v : chan.connections)
                         u.interference += u.id == v.id ? 0.0 : affectance[u.id][v.id];
 
-                    chThroughput += computeConnectionThroughput(u, bw);
+                    chan.throughput += computeConnectionThroughput(u, chan.bandwidth);
                 }
-                OF += chThroughput;
+                OF += chan.throughput;
             }
         }
     }
@@ -881,7 +878,6 @@ void recoverSolution(int k, int i, int j, bool clean) {
 
 int count_conn(const Solution &sol, bool op) {
     int ret = 0;
-    // return 0;
 #ifdef MDVRBSP
     if (!sol.slots[0].spectrums[3].channels[0].connections.empty()) {
         for (auto &c : sol.slots[0].spectrums[3].channels[0].connections)
