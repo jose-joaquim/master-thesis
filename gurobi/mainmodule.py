@@ -63,17 +63,20 @@ def distanceAndInterference(
     alfa,
 ):
     for i in range(nConnections):
-        # distanceMatrix.append([])
-        # interferenceMatrix.append([])
         X_si = receivers[i][0]
         Y_si = receivers[i][1]
+
+        # X_si = senders[i][0]
+        # Y_si = senders[i][1]
 
         for j in range(nConnections):
             X_rj = senders[j][0]
             Y_rj = senders[j][1]
 
+            # X_rj = receivers[j][0]
+            # Y_rj = receivers[j][1]
+
             dist = distance(X_si, Y_si, X_rj, Y_rj)
-            # distanceMatrix[i].append(dist)
             distanceMatrix[i][j] = dist
 
             if i == j:
@@ -267,7 +270,7 @@ def initialize():
         "../instances/md-vrbsp/U_"
         + str(U_n)
         + "/"
-        # + p_type
+        # + p_type + "_"
         + "U_"
         + str(U_n)
         + "_"
@@ -368,13 +371,18 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         m = gp.Model("raw model")
         x, I_ = {}, {}
 
+        if isfile("./warm.mst"):
+            with open("./warm.mst", "r") as sol:
+                NTS = int(sol.readline().split()[1])
+                print("new NTS is " + str(NTS))
+
         if sys.argv[5] == "mdvrbsp-bigm":
             import mdvrbsp_bigm_imp2 as mdBig
 
             BM = computeBigM(N, IM, DM, AFF)
             print("CREATING MDVRBSP BIG-M MODEL")
             m, x, I_ = mdBig.defineModel(
-                N, 4, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+                N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
             )
         elif sys.argv[5] == "mdvrbsp-quad":
             import mdvrbsp_quadvars_imp2 as mdQuad
@@ -395,26 +403,33 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
             sys.exit(1)
 
         # m.write(sys.argv[5] + ".lp")
-        # file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
-        # m.Params.logFile = file_log
-        # m.Params.logToConsole = 0
-        # m.Params.timeLimit = 3600
-        # m.Params.intFeasTol = 1e-5
-        # m.Params.iisMethod = 1
+        if isfile("params.prm"):
+            m.read("params.prm")
+        else:
+            file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
+            m.Params.logFile = file_log
+            m.Params.logToConsole = 0
+            m.Params.timeLimit = 3600
+            m.Params.intFeasTol = 1e-5
+            m.Params.iisMethod = 1
 
-        m.write("model1.lp")
+        # m.write("model1.lp")
 
         if isfile("./warm.mst"):
-            with open("./warm.mst", "r") as sol:
-                for line in sol:
-                    arr = line.split()
-                    m.getVarByName(arr[0]).ub = float(arr[1])
-                    m.getVarByName(arr[0]).lb = float(arr[1])
-
-                m.write("model2.lp")
+            m.read("warm.mst")
+            # with open("./warm.mst", "r") as sol:
+            #     for line in sol:
+            #         arr = line.split()
+            #         if arr[0] == "#":
+            #             continue
+            # 
+            #         m.getVarByName(arr[0]).ub = float(arr[1])
+            #         m.getVarByName(arr[0]).lb = float(arr[1])
+            # 
+            #     m.write("model2.lp")
 
         m.optimize()
-        # postProcess(m, x, I_, N, NTS, dicCH)
+        postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))

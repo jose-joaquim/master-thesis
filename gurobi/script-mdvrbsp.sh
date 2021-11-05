@@ -13,7 +13,7 @@ do
     #     ./mainmodule.py ${inst} ${v} ${path_results_final} 1 mdvrbsp-quad
     # done;
 
-    for inst in 64;
+    for inst in 256;
     do
         path_results="results/mdvrbsp-bigm/U_"
         path_results_final=${path_results}${inst};
