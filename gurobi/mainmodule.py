@@ -13,8 +13,8 @@ rst_headers = [
     "MIPGap",
     "NumVars",
     "NumConstrs",
+    "NumNZs",
     "IterCount",
-    "BarIterCount",
     "NodeCount",
     "Runtime",
 ]
@@ -371,24 +371,49 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         m = gp.Model("raw model")
         x, I_ = {}, {}
 
-        if isfile("./warm.mst"):
-            with open("./warm.mst", "r") as sol:
-                NTS = int(sol.readline().split()[1])
-                print("new NTS is " + str(NTS))
-
-        if sys.argv[5] == "mdvrbsp-bigm":
-            import mdvrbsp_bigm_imp2 as mdBig
-
-            BM = computeBigM(N, IM, DM, AFF)
-            print("CREATING MDVRBSP BIG-M MODEL")
-            m, x, I_ = mdBig.defineModel(
-                N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+        if "mdvrbsp" in sys.argv[5]:
+            pw = (
+                "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
+                + str(N)
+                + "/solution"
+                + str(sys.argv[2])
+                + ".mst"
             )
-        elif sys.argv[5] == "mdvrbsp-quad":
-            import mdvrbsp_quadvars_imp2 as mdQuad
 
-            print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
-            m, x, I_ = mdQuad.defineModel(N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx)
+            if isfile(pw):
+                with open(pw, "r") as sol:
+                    NTS = int(sol.readline().split()[1])
+                    print("new NTS is " + str(NTS))
+
+            if sys.argv[5] == "mdvrbsp-bigm":
+                import mdvrbsp_bigm_imp2 as mdBig
+
+                BM = computeBigM(N, IM, DM, AFF)
+                print("CREATING MDVRBSP BIG-M MODEL")
+                m, x, I_ = mdBig.defineModel(
+                    N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+                )
+            elif sys.argv[5] == "mdvrbsp-quad":
+                import mdvrbsp_quadvars_imp2 as mdQuad
+
+                print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
+                m, x, I_ = mdQuad.defineModel(
+                    N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx
+                )
+
+            m.update()
+            if isfile(pw):
+                m.read(pw)
+                # with open("./warm.mst", "r") as sol:
+                #     for line in sol:
+                #         arr = line.split()
+                #         if arr[0] == "#":
+                #             continue
+                #
+                #         m.getVarByName(arr[0]).ub = float(arr[1])
+                #         m.getVarByName(arr[0]).lb = float(arr[1])
+                #
+                #     m.write("model2.lp")
         elif sys.argv[5] == "vrbsp-big":
             import vrbsp_lin_impr as vrBig
 
@@ -412,21 +437,6 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
             m.Params.timeLimit = 3600
             m.Params.intFeasTol = 1e-5
             m.Params.iisMethod = 1
-
-        # m.write("model1.lp")
-
-        if isfile("./warm.mst"):
-            m.read("warm.mst")
-            # with open("./warm.mst", "r") as sol:
-            #     for line in sol:
-            #         arr = line.split()
-            #         if arr[0] == "#":
-            #             continue
-            # 
-            #         m.getVarByName(arr[0]).ub = float(arr[1])
-            #         m.getVarByName(arr[0]).lb = float(arr[1])
-            # 
-            #     m.write("model2.lp")
 
         m.optimize()
         postProcess(m, x, I_, N, NTS, dicCH)

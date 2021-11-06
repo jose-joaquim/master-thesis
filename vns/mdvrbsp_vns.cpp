@@ -218,7 +218,7 @@ Solution delete_time_slot(const Solution &sol) {
     return ret;
 }
 
-Solution vns(Solution initial, FILE *objImpF) {
+Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
     Solution incumbent = initial;
     Solution delta = convertTo20MhzSol(initial);
     Solution local_min = delta;
@@ -227,11 +227,10 @@ Solution vns(Solution initial, FILE *objImpF) {
     int K_MAX = min(n_connections, 10);
     bool first = true;
 
-    int iter = 0;
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
-            ++iter;
+            ++outerIter;
             assert(delta.slots[0].spectrums[3].channels[0].connections.empty());
             delta = local_min;
 
@@ -263,11 +262,9 @@ Solution vns(Solution initial, FILE *objImpF) {
                 k += 1;
 
             if (compareObjectives(local_min, incumbent) < 0 || first) {
+                ++outerIter;
                 count_conn(explicit_sol);
                 double currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
-
-                // if (objImpF != nullptr)
-                //     fprintf(objImpF, "%lf %.2lf\n", currTime, local_min.violation);
 
                 first = false;
                 printf("%lf %.2lf %.2lf\n", currTime, local_min.violation, incumbent.violation);
@@ -285,11 +282,14 @@ Solution vns(Solution initial, FILE *objImpF) {
 
 Solution reductionHeuristic(char **argv) {
     string objImp = string(argv[3]);
-    objImp += "/objective_improvements" + string(argv[2]);
-    objImp += ".txt";
-
+    objImp += "/objective_improvements" + string(argv[2]) + ".txt";
     FILE *objImpOut = fopen(objImp.c_str(), "w");
     assert(objImpOut != nullptr);
+
+    string itStr = string(argv[3]);
+    itStr += "/iterations" + string(argv[2]) + ".txt";
+    FILE *itFile = fopen(itStr.c_str(), "w");
+    assert(itFile != nullptr);    
 
     Solution S_star = constructive_heuristic(objImpOut);
 
@@ -318,7 +318,10 @@ Solution reductionHeuristic(char **argv) {
             return S1;
 
         printf("removed %d ts. Violation is now %lf\n", cnt, S1.violation);
-        S1 = vns(S1, objImpOut);
+        int outerIter = 0, impIter = 0;
+        S1 = vns(S1, objImpOut, outerIter, impIter);
+
+        fprintf(itFile, "%d %d\n", outerIter, impIter);
 
         if (yFeasible(S1)) {
             count_conn(S1);
@@ -333,6 +336,8 @@ Solution reductionHeuristic(char **argv) {
     }
 
     fclose(objImpOut);
+    fclose(itFile);
+    assert(is_feasible(S_star));
     count_conn(S_star);
     return S_star;
 }
@@ -430,6 +435,7 @@ int main(int argc, char **argv) {
     maximumTime = stoi(argv[4]) * 1.0;
     Solution inc = reductionHeuristic(argv);
 
+    assert(is_feasible(inc));
     solution_file(inc, argv);
     solution_gurobi(inc, argv);
     return 0;

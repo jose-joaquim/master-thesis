@@ -2,8 +2,8 @@
 
 make mdvrbsp
 
-arr_of=("MINMAX" "SUMVIO")
-arr_ch=("RANDOM" "GREEDY")
+arr_of=("MINMAX") # "SUMVIO")
+arr_ch=("RANDOM") # "GREEDY")
 
 path_results="results/mdvrbsp/U_"
 
