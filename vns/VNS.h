@@ -53,9 +53,9 @@ static int child[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS][2];
 static double chanOF[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static bool inSolution[MAX_SLOTS][MAX_SPECTRUM][MAX_CHANNELS];
 static CH_PARAMS ch_opt;
-static OF_TYPE of_opt;
 
 #ifdef MDVRBSP
+static OF_TYPE of_opt;
 static vector<double> gma;
 #endif
 
@@ -738,11 +738,13 @@ Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
     for (Connection &connection : newChannel.connections) {
         computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
+#ifdef MDVRBSP
 #ifdef SUMVIO
         newChannel.violation += max(0.0, gma[connection.id] - connection.throughput);
 #else
         newChannel.violation =
             max(newChannel.violation, gma[connection.id] - connection.throughput);
+#endif
 #endif
     }
 
@@ -763,10 +765,12 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
 
         computeConnectionThroughput(conn, newChannel.bandwidth);
         newChannel.throughput += conn.throughput;
+#ifdef MDVRBSP
 #ifdef SUMVIO
         newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
 #else
         newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
+#endif
 #endif
     }
 
