@@ -19,6 +19,6 @@ do
         path_results_final=${path_results}${inst};
         echo $path_results_final
         mkdir -p $path_results_final
-        ./mainmodule.py ${inst} ${v} ${path_results_final} 1 mdvrbsp-bigm
+        ./mainmodule.py ${inst} ${v} ${path_results_final} 1 mdvrbsp-quad
     done;
 done

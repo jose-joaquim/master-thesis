@@ -17,9 +17,6 @@ def defineModel(N, NTS, AFF, AUXNC, B, NOI, OVER, cToBIdx):
         return t, x, I_, z, w
 
     def constraints(t, x, I_, z, w):
-        # 0
-        m.addConstr(t.sum() >= 1, "force")
-
         # 1
         m.addConstrs((t[i + 1] <= t[i] for i in range(NTS - 1)), "ts")
 
@@ -83,7 +80,7 @@ def defineModel(N, NTS, AFF, AUXNC, B, NOI, OVER, cToBIdx):
             (
                 I_[i]
                 <= gp.quicksum(
-                    (AFF[i][i] / B[i][cToBIdx(c[1])] * x[i, c[0], t_]) - NOI
+                    (AFF[i][i] / B[i][cToBIdx(c[1])] - NOI) * x[i, c[0], t_]
                     for t_ in range(NTS)
                     for c in AUXNC.items()
                 )
