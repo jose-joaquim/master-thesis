@@ -15,10 +15,11 @@ do
 
     for inst in 64;
     do
-        path_results="results/mdvrbsp-bigm/U_"
+        var="mdvrbsp-quad"
+        path_results="results/${var}/U_"
         path_results_final=${path_results}${inst};
         echo $path_results_final
         mkdir -p $path_results_final
-        ./mainmodule.py ${inst} ${v} ${path_results_final} 1 mdvrbsp-quad
+        ./mainmodule.py ${inst} ${v} ${path_results_final} 1 ${var}
     done;
 done

@@ -303,16 +303,16 @@ def postProcess(m, x, I_, N, NTS, dic):
             out_re.write(str(m.getAttr(rst_headers[len(rst_headers) - 1])))
             out_re.write("\n")
 
-            if m.status == GRB.OPTIMAL:
-                file_name = sys.argv[3] + "/out-formatted" + str(sys.argv[2]) + ".txt"
-                # conn, channel, MCS, interference
-                with open(file_name, "a") as f:
-                    f.write(str(m.objVal) + "\n")
-                    for i in range(N):
-                        for c in dic:
-                            for t in range(NTS):
-                                if x[i, c, t].x == 1.0:
-                                    f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
+            # if m.status == GRB.OPTIMAL:
+            #     file_name = sys.argv[3] + "/out-formatted" + str(sys.argv[2]) + ".txt"
+            #     # conn, channel, MCS, interference
+            #     with open(file_name, "a") as f:
+            #         f.write(str(m.objVal) + "\n")
+            #         for i in range(N):
+            #             for c in dic:
+            #                 for t in range(NTS):
+            #                     if x[i, c, t].x == 1.0:
+            #                         f.write("%d %d %d %.12f\n" % (i, c, t, I_[i].x))
 
 
 def computeBigM(nConnections, interferenceMatrix, distanceMatrix, AFF):
@@ -369,7 +369,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
 
         dicCH = {i: auxNC[i] for i in range(len(auxNC))}
         m = gp.Model("raw model")
-        x, I_ = {}, {}
+        x, y, I_ = {}, {}, {}
 
         if "mdvrbsp" in sys.argv[5]:
             pw = (
@@ -414,16 +414,25 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
                 #         m.getVarByName(arr[0]).lb = float(arr[1])
                 #
                 #     m.write("model2.lp")
-        elif sys.argv[5] == "vrbsp-big":
-            import vrbsp_lin_impr as vrBig
 
-            print("TODO")
-            sys.exit(1)
-        elif sys.argv[5] == "vrbsp-quad":  # TODO
-            import vrbsp_xijc as vrTODO
+        elif sys.argv[5] == "vrbsp-xijcm":
+            import vrbsp_xijc_bigm as vrX
 
-            print("TODO")
-            sys.exit(1)
+            print("vrbsp xijcm")
+            BM = computeBigM(N, IM, DM, AFF)
+            m, x, I_ = vrX.defineModel(
+                N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM, cToBIdx
+            )
+
+            # sys.exit(1)
+        elif sys.argv[5] == "vrbsp-ybm":
+            import vrbsp_ybm_bigm as vrY
+
+            print("vrbsp ybm")
+            BM = computeBigM(N, IM, DM, AFF)
+            m, x, y, I_ = vrY.defineModel(N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM)
+
+            # sys.exit(1)
         else:
             sys.exit(1)
 
@@ -435,7 +444,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
             m.Params.logFile = file_log
             m.Params.logToConsole = 0
             m.Params.timeLimit = 3600
-            m.Params.intFeasTol = 1e-5
+            m.Params.intFeasTol = 1e-6
             m.Params.iisMethod = 1
 
         m.optimize()
