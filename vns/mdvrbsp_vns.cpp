@@ -151,27 +151,27 @@ Solution constructive_heuristic(FILE *objImpF) {
                     }
                 }
             }
+        }
 
-            // if (!success) {
-            //     TimeSlot new_ts(dummy_ts);
-            // }
+        // if (!success) {
+        //     TimeSlot new_ts(dummy_ts);
+        // }
 
-            // 2. Se chegou ate aqui e link nao foi inserido:
-            //    - crie novo time-slot e insira no canal de maior largura de banda
-            if (!success) {
-                TimeSlot new_ts(dummy_ts);
-                for (int s = 0; s < new_ts.spectrums.size() && !success; s++) {
-                    for (int c = 0; c < new_ts.spectrums[s].channels.size() && !success; c++) {
-                        int bw = new_ts.spectrums[s].channels[c].bandwidth;
-                        if (bw >= 160) {
-                            Connection new_conn(conn);
-                            new_conn.SINR = 1000000007;
-                            new_conn.throughput = dataRates[11][bwIdx(bw)];
-                            new_ts.spectrums[s].channels[c].connections.push_back(new_conn);
-                            ret.slots.emplace_back(new_ts);
-                            success = true;
-                            break;
-                        }
+        // 2. Se chegou ate aqui e link nao foi inserido:
+        //    - crie novo time-slot e insira no canal de maior largura de banda
+        if (!success) {
+            TimeSlot new_ts(dummy_ts);
+            for (int s = 0; s < new_ts.spectrums.size() && !success; s++) {
+                for (int c = 0; c < new_ts.spectrums[s].channels.size() && !success; c++) {
+                    int bw = new_ts.spectrums[s].channels[c].bandwidth;
+                    if (bw >= 160) {
+                        Connection new_conn(conn);
+                        new_conn.SINR = 1000000007;
+                        new_conn.throughput = dataRates[11][bwIdx(bw)];
+                        new_ts.spectrums[s].channels[c].connections.push_back(new_conn);
+                        ret.slots.emplace_back(new_ts);
+                        success = true;
+                        break;
                     }
                 }
             }
@@ -289,7 +289,7 @@ Solution reductionHeuristic(char **argv) {
     string itStr = string(argv[3]);
     itStr += "/iterations" + string(argv[2]) + ".txt";
     FILE *itFile = fopen(itStr.c_str(), "w");
-    assert(itFile != nullptr);    
+    assert(itFile != nullptr);
 
     Solution S_star = constructive_heuristic(objImpOut);
 
@@ -376,8 +376,10 @@ void read_params(char *path) {
 
         fclose(fp);
         fp = nullptr;
-    } else
+    } else {
         puts("could not open params file!");
+        exit(1);
+    }
 }
 
 void solution_gurobi(const Solution &inc, char **argv) {
@@ -413,7 +415,7 @@ int main(int argc, char **argv) {
         read_params(argv[5]);
     } else {
         puts("setting default parameters");
-        ch_opt = GREEDY;
+        ch_opt = RANDOM;
         of_opt = MINMAX;
     }
 

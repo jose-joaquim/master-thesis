@@ -25,7 +25,7 @@ do
                 echo $path_var
                 mkdir -p $path_var
 
-                echo "./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time} $of $ch"
+                echo "./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} $of $ch"
                 ./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} ${of} ${ch}
             done;
         done;

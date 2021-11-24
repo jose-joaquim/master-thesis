@@ -160,9 +160,11 @@ struct Connection {
     double interference;
     double SINR;
     double distanceSR;
+    double violation;
 
     Connection(int id, double throughput, double interference, double distanceSR)
         : id(id), throughput(throughput), interference(interference), distanceSR(distanceSR) {
+        violation = 0.0;
         SINR = 0.0;
     }
 
@@ -170,6 +172,7 @@ struct Connection {
         throughput = 0.0;
         interference = 0.0;
         SINR = 0.0;
+        violation = 0.0;
         distanceSR = distanceMatrix[id][id];
     }
 
@@ -223,9 +226,7 @@ struct TimeSlot {
     double interference;
     double throughput;
 
-    TimeSlot(const vector<Spectrum> sp) : TimeSlot() {
-        spectrums = sp;
-    }
+    TimeSlot(const vector<Spectrum> sp) : TimeSlot() { spectrums = sp; }
     TimeSlot() {
         interference = 0.0;
         throughput = 0.0;
@@ -307,14 +308,16 @@ bool definitelyLessThan(double a, double b, double epsilon = EPS) {
 
 #ifdef MDVRBSP
 double computeViolation(Solution &sol) {
-    if (of_opt == SUMVIO) {
+    if (of_opt == MINMAX) {
         sol.violation = 0.0;
         for (TimeSlot &ts : sol.slots)
             for (Spectrum &sp : ts.spectrums)
                 for (Channel &ch : sp.channels) {
                     double higher = 0.0;
-                    for (const Connection &conn : ch.connections)
-                        higher = max(higher, gma[conn.id] - conn.throughput);
+                    for (Connection &conn : ch.connections) {
+                        conn.violation = max(0.0, gma[conn.id] - conn.throughput);
+                        higher = max(higher, conn.violation);
+                    }
 
                     ch.violation = higher;
                     sol.violation = max(sol.violation, ch.violation);
@@ -325,13 +328,16 @@ double computeViolation(Solution &sol) {
             for (Spectrum &sp : ts.spectrums)
                 for (Channel &ch : sp.channels) {
                     double sum = 0.0;
-                    for (const auto &conn : ch.connections)
-                        sum += max(0.0, gma[conn.id] - conn.throughput);
+                    for (Connection &conn : ch.connections) {
+                        conn.violation = max(0.0, gma[conn.id] - conn.throughput);
+                        sum += max(0.0, conn.violation);
+                    }
 
                     ch.violation = sum;
                     sol.violation += ch.violation;
                 }
     }
+
     return sol.violation;
 }
 
@@ -517,13 +523,26 @@ void read_data() {
         senders[i][1] = b;
     }
 
+    int seila[] = {0, 0, 0, 0};
     for (int i = 0; i < n_connections; i++) {
         double bt;
         scanf("%lf", &bt);
 #ifdef MDVRBSP
         gma.emplace_back(bt);
+        if (bt <= 143.4)
+            ++seila[0];
+        else if (bt <= 286.8)
+            ++seila[1];
+        else if (bt <= 600.5)
+            ++seila[2];
+        else if (bt <= 1201)
+            ++seila[3];
 #endif
     }
+
+    for (int i = 0; i < 4; i++)
+        printf("%d ", seila[i]);
+    puts("");
 
     dataRates.assign(12, vector<double>(4, 0));
     for (int i = 0; i < 12; i++) {
@@ -739,12 +758,11 @@ Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
         computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
 #ifdef MDVRBSP
-#ifdef SUMVIO
-        newChannel.violation += max(0.0, gma[connection.id] - connection.throughput);
-#else
-        newChannel.violation =
-            max(newChannel.violation, gma[connection.id] - connection.throughput);
-#endif
+        // TODO: conectar connection.violation aqui
+        if (of_opt == SUMVIO)
+            newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
+        else if (of_opt == MINMAX)
+            newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
 #endif
     }
 
@@ -766,11 +784,11 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
         computeConnectionThroughput(conn, newChannel.bandwidth);
         newChannel.throughput += conn.throughput;
 #ifdef MDVRBSP
-#ifdef SUMVIO
-        newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
-#else
-        newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
-#endif
+        // TODO: conectar connection.violation aqui
+        if (of_opt == SUMVIO)
+            newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
+        else if (of_opt == MINMAX)
+            newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
 #endif
     }
 
@@ -1163,14 +1181,26 @@ double solve(int k, int i, int j) {
         double a2 = solve(k, i, child[k][i][j][1]);
 
 #ifdef MDVRBSP
-        bool improved = a1 + a2 < ret;
+        if (definitelyLessThan(a1, ret) || definitelyLessThan(a2, ret)) {
+            ret = min(a1, a2);
+            inSolution[k][i][j] = false;
+        }
 #else
-        bool improved = a1 + a2 > ret;
-#endif
-        if (improved) {
+        if (a1 + a2 > ret) {
             ret = a1 + a2;
             inSolution[k][i][j] = false;
         }
+#endif
+
+// #ifdef MDVRBSP
+//         bool improved = a1 + a2 < ret;
+// #else
+//         bool improved = a1 + a2 > ret;
+// #endif
+//         if (improved) {
+//             ret = a1 + a2;
+//             inSolution[k][i][j] = false;
+//         }
     }
 
     return ret;
@@ -1224,7 +1254,12 @@ double calcDP(const Solution &sol, bool ok = false) {
             for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
                 if (parent[t][s][c] == -1) {
                     double ret = solve(t, s, c);
+#ifndef MDVRBSP
                     OF += ret;
+#else
+                    // TODO: aqui eu so considero MINMAX
+                    OF = max(OF, ret);
+#endif
                 }
             }
         }
@@ -1335,9 +1370,37 @@ inline void addEverywhere(Solution &sol, int id) {
 Solution local_search(Solution &multiple, Solution &curr) {
     bool improved = false;
 
+    int cnt = 0;
     do {
         improved = false;
-        for (int i = 0; i < n_connections; i++) {
+
+        vector<int> target;
+        for (int i = 0; i < n_connections; i++)
+            target.emplace_back(i);
+
+// #ifdef MDVRBSP
+//         if (of_opt == MINMAX) {
+//             target.clear();
+//             for (const TimeSlot &ts : curr.slots) {
+//                 for (const Spectrum &sp : ts.spectrums) {
+//                     for (const Channel &ch : sp.channels) {
+//                         for (const Connection &conn : ch.connections) {
+//                             if (approximatelyEqual(conn.violation, curr.violation)) {
+//                                 target.emplace_back(conn.id);
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+// #endif
+//         if (target.empty()) {
+//             assert(cnt > 0);
+//             return reconstruct_sol(multiple);
+//         }
+        // assert(!target.empty());
+        // for (int i = 0; i < n_connections; i++) {
+        for (int i : target) {
             Solution mult_clean(multiple);
             removeAllOccurrences(mult_clean, i);
 
@@ -1410,6 +1473,7 @@ Solution local_search(Solution &multiple, Solution &curr) {
                 }
             }
         }
+        ++cnt;
     } while (improved);
 
     return reconstruct_sol(multiple);
