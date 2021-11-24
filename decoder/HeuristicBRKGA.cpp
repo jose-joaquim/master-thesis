@@ -7,35 +7,22 @@ using namespace std;
 int populationSize;
 int numberVariables;
 double maximumTime;
+FILE *seila;
 
 // variante, tempo limite, criterio de parada, objectiveFile, solutionFile, instanciaFile
-void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objectivesFile = nullptr) {
-    if (argc != 5) {
-        fprintf(stderr,
-                "wrong arguments. Provided %d, Must be: stdin, solutionFile, objectiveFile, "
-                "timeLimit\n",
-                argc);
-        exit(13);
+void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
+    string path_input = "../instances/md-vrbsp/U_";
+    path_input += string(argv[1]) + "/U_";
+    // path_input += "/MD-VRBSP_U_";
+    path_input += string(argv[1]);
+    path_input += "_";
+    path_input += string(argv[2]);
+    path_input += ".txt";
+    if (!path_input.empty()) {
+        fprintf(stderr, "trying to open input file %s\n", path_input.c_str());
+        freopen(path_input.c_str(), "r", stdin);
     }
-
-    const string openingFile(argv[1]);
-    if (!openingFile.empty()) {
-        fprintf(stderr, "trying to open input file %s\n", openingFile.c_str());
-        freopen(openingFile.c_str(), "r", stdin);
-    }
-
-    *solutionFile = fopen(argv[2], "a");
-    if (*solutionFile == nullptr) {
-        fprintf(stderr, "error opening solutionFile file\n");
-        exit(13);
-    }
-
-    *objectivesFile = fopen(argv[3], "a");
-    if (*objectivesFile == nullptr) {
-        fprintf(stderr, "error opening objectivesFile file\n");
-        exit(13);
-    }
-
+    
     maximumTime = stoi(argv[4]);
 
     if (stdin == nullptr) {
@@ -47,11 +34,17 @@ void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objective
     populationSize = 100;
     numberVariables = 2 * nConnections;
 
-    fprintf(stdout, "[BRKGA variant %s] will execute for %lf seconds\n", argv[5], maximumTime);
+    string solFile = string(string(argv[3])  + string("/solutionFile.txt"));      
+    *solutionFile = fopen(solFile.c_str(), "w");
+
+    string objFile = string(string(argv[3]) + string("/objectives.txt"));
+    *objectivesFile = fopen(objFile.c_str(), "a");
+
+    fprintf(stdout, "BRKGA will execute for %lf seconds\n", maximumTime);
 }
 
 int main(int argc, char **argv) {
-    FILE *solutionFile = nullptr, *objectivesFile = nullptr;
+    FILE *solutionFile = nullptr,  *objectivesFile = nullptr;
     init(argc, argv, &solutionFile, &objectivesFile);
 
     const unsigned p = populationSize; // size of population
