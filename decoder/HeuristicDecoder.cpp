@@ -189,6 +189,7 @@ int bwIdx(int bw) {
     return 0;
 }
 
+
 double computeConnectionThroughput(Connection &conn, int bandwidth) {
     if (bandwidth == 0)
         return 0.0;
@@ -287,6 +288,7 @@ double computeThroughput(Solution &curr) {
 
                     chThroughput += computeConnectionThroughput(u, bw);
                 }
+
                 OF += chThroughput;
             }
         }

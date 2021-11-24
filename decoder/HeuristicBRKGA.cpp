@@ -34,7 +34,7 @@ void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
     populationSize = 100;
     numberVariables = 2 * nConnections;
 
-    string solFile = string(string(argv[3])  + string("/solutionFile.txt"));      
+    string solFile = string(string(argv[3])  + string("/solutionFile") + string(argv[2]) + string(".txt"));      
     *solutionFile = fopen(solFile.c_str(), "w");
 
     string objFile = string(string(argv[3]) + string("/objectives.txt"));
