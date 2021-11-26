@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     }
 
     if (objectivesFile != nullptr) {
-        fprintf(objectivesFile, "%lf\n", -1.0 * algorithm.getBestFitness());
+        fprintf(objectivesFile, "%lf %d\n", -1.0 * algorithm.getBestFitness(), quantIteracoes);
     } else {
         fprintf(stderr, "objectivesFiles is null!\n");
         exit(13);
