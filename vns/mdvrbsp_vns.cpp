@@ -235,14 +235,17 @@ Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
             delta = local_min;
 
             perturbation(delta, k * K_MUL);
-            computeViolation(delta);
+            // computeViolation(delta);
 
             Solution multiple = multipleRepresentation(delta);
 
             setDP(multiple);
             delta.violation = calcDP(multiple);
+            // auto seila = reconstruct_sol(multiple);
+            // checkVio(seila);
 
-            Solution explicit_sol = local_search(multiple, delta);
+            Solution explicit_sol = local_search(multiple, delta/*, seila*/);
+            checkVio(explicit_sol);
 
             if (essentiallyEqual(explicit_sol.violation, 0.0)) {
                 printf("found solution with violation 0.0!\n");
@@ -400,8 +403,8 @@ void solution_file(const Solution &inc, char **argv) {
 
 int main(int argc, char **argv) {
     string path_input = "../instances/md-vrbsp/U_";
-    path_input += string(argv[1]) + "/U_";
-    // path_input += "/MD-VRBSP_U_";
+    path_input += string(argv[1]);// + "/U_";
+    path_input += "/MD-VRBSP_U_";
     path_input += string(argv[1]);
     path_input += "_";
     path_input += string(argv[2]);

@@ -760,7 +760,7 @@ Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
 #ifdef MDVRBSP
         // TODO: conectar connection.violation aqui
         if (of_opt == SUMVIO)
-            newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
+            newChannel.violation += max(0.0, gma[connection.id] - connection.throughput);
         else if (of_opt == MINMAX)
             newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
 #endif
@@ -786,7 +786,7 @@ Channel deleteFromChannel(const Channel &channel, int idConn) {
 #ifdef MDVRBSP
         // TODO: conectar connection.violation aqui
         if (of_opt == SUMVIO)
-            newChannel.violation += max(0.0, gma[connection.id] - connection.thoughput);
+            newChannel.violation += max(0.0, gma[conn.id] - conn.throughput);
         else if (of_opt == MINMAX)
             newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
 #endif
@@ -1030,11 +1030,11 @@ bool fix_channels(Solution &sol) {
             }
         }
     } while (improved);
-    computeThroughput(sol);
-
-#ifdef MDVRBSP
-    computeViolation(sol);
-#endif
+//     computeThroughput(sol);
+// 
+// #ifdef MDVRBSP
+//     computeViolation(sol);
+// #endif
     return improved;
 }
 
@@ -1111,11 +1111,11 @@ Solution multipleRepresentation(Solution ret) {
             }
         }
     }
-    computeThroughput(ret);
-
-#ifdef MDVRBSP
-    computeViolation(ret);
-#endif
+//     computeThroughput(ret);
+// 
+// #ifdef MDVRBSP
+//     computeViolation(ret);
+// #endif
     return ret;
 }
 
@@ -1367,7 +1367,7 @@ inline void addEverywhere(Solution &sol, int id) {
     }
 }
 
-Solution local_search(Solution &multiple, Solution &curr) {
+Solution local_search(Solution &multiple, Solution &curr/*, const Solution &seila*/) {
     bool improved = false;
 
     int cnt = 0;
@@ -1381,11 +1381,11 @@ Solution local_search(Solution &multiple, Solution &curr) {
 // #ifdef MDVRBSP
 //         if (of_opt == MINMAX) {
 //             target.clear();
-//             for (const TimeSlot &ts : curr.slots) {
+//             for (const TimeSlot &ts : seila.slots) {
 //                 for (const Spectrum &sp : ts.spectrums) {
 //                     for (const Channel &ch : sp.channels) {
 //                         for (const Connection &conn : ch.connections) {
-//                             if (approximatelyEqual(conn.violation, curr.violation)) {
+//                             if (approximatelyEqual(conn.violation, seila.violation)) {
 //                                 target.emplace_back(conn.id);
 //                             }
 //                         }
@@ -1398,8 +1398,7 @@ Solution local_search(Solution &multiple, Solution &curr) {
 //             assert(cnt > 0);
 //             return reconstruct_sol(multiple);
 //         }
-        // assert(!target.empty());
-        // for (int i = 0; i < n_connections; i++) {
+     // for (int i = 0; i < n_connections; i++) {
         for (int i : target) {
             Solution mult_clean(multiple);
             removeAllOccurrences(mult_clean, i);
@@ -1548,6 +1547,23 @@ inline void perturbation(Solution &sol, int kkmul) {
 #else
     K_RemoveAndInserts(sol, kkmul);
 #endif
+}
+
+bool checkVio(const Solution &sol) {
+    double m_ = numeric_limits<double>::min();
+
+    for (int t = 0; t < sol.slots.size(); t++) {
+        for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
+            for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
+                for (const auto &conn : sol.slots[t].spectrums[s].channels[c].connections) {
+                    m_ = max(m_, conn.violation);
+                }
+            }
+        }
+    }
+
+    assert(approximatelyEqual(sol.violation, m_));
+    return approximatelyEqual(sol.violation, m_);
 }
 
 #endif
