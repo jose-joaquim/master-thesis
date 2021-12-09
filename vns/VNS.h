@@ -470,6 +470,17 @@ int cToBIdx(int c) {
         return 3;
 }
 
+int bToIdx(int b) {
+    if (b == 20)
+        return 0;
+    else if (b == 40)
+        return 1;
+    else if (b == 80)
+        return 2;
+
+    return 3;
+}
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 static vector<Spectrum> init_conf;
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -746,7 +757,7 @@ double computeConnectionThroughput(Connection &conn, int bandwidth) {
 Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
     Connection conn(idConn, 0.0, 0.0, distanceMatrix[idConn][idConn]);
 
-    for (Connection &connection : newChannel.connections) {
+    for (auto &connection : newChannel.connections) {
         connection.interference += affectance[connection.id][idConn];
         conn.interference += affectance[idConn][connection.id];
     }
@@ -754,15 +765,16 @@ Channel insertInChannel(Channel newChannel, int idConn) { // TODO: remover macro
     newChannel.connections.emplace_back(conn);
     newChannel.throughput = 0.0;
     newChannel.violation = 0.0;
-    for (Connection &connection : newChannel.connections) {
+    for (auto &connection : newChannel.connections) {
         computeConnectionThroughput(connection, newChannel.bandwidth);
         newChannel.throughput += connection.throughput;
+
 #ifdef MDVRBSP
-        // TODO: conectar connection.violation aqui
+        connection.violation = max(0.0, gma[connection.id] - connection.throughput);
         if (of_opt == SUMVIO)
-            newChannel.violation += max(0.0, gma[connection.id] - connection.throughput);
+            newChannel.violation += max(0.0, connection.violation);
         else if (of_opt == MINMAX)
-            newChannel.violation = max(newChannel.violation, gma[conn.id] - conn.throughput);
+            newChannel.violation = max(newChannel.violation, connection.violation);
 #endif
     }
 
@@ -945,10 +957,9 @@ Solution reconstruct_sol(const Solution &curr) {
     Solution ret;
     ret.slots.resize(curr.slots.size());
 
-    for (int t = 0; t < curr.slots.size(); t++) {
+    for (int t = 0; t < curr.slots.size(); t++)
         ret.slots[t].spectrums.resize(curr.slots[t].spectrums.size(),
                                       Spectrum(0.0, 0.0, vector<Channel>()));
-    }
 
     for (int t = 0; t < curr.slots.size(); t++) {
         for (int s = 0; s < curr.slots[t].spectrums.size(); s++) {
@@ -977,7 +988,6 @@ Solution reconstruct_sol(const Solution &curr) {
     computeViolation(ret);
 #endif
 
-    // count_conn(ret);
     return ret;
 }
 
@@ -1030,11 +1040,11 @@ bool fix_channels(Solution &sol) {
             }
         }
     } while (improved);
-//     computeThroughput(sol);
-// 
-// #ifdef MDVRBSP
-//     computeViolation(sol);
-// #endif
+    //     computeThroughput(sol);
+    //
+    // #ifdef MDVRBSP
+    //     computeViolation(sol);
+    // #endif
     return improved;
 }
 
@@ -1045,7 +1055,6 @@ Solution convertTo20MhzSol(Solution exps) {
         }
     }
 
-    // count_conn(exps);
     while (!allChannels20MHz(exps)) {
         for (TimeSlot &ts : exps.slots) {
             for (Spectrum &sp : ts.spectrums) {
@@ -1074,8 +1083,6 @@ Solution convertTo20MhzSol(Solution exps) {
         }
     }
 
-    // count_conn(exps);
-
     return exps;
 }
 
@@ -1093,7 +1100,7 @@ Solution multipleRepresentation(Solution ret) {
                     Channel merged = spectrum.channels[curr];
                     merged.bandwidth *= 2;
 
-                    for (const Connection &conn : spectrum.channels[curr + 1].connections) {
+                    for (const auto &conn : spectrum.channels[curr + 1].connections) {
                         merged.connections.emplace_back(conn);
                     }
 
@@ -1111,11 +1118,11 @@ Solution multipleRepresentation(Solution ret) {
             }
         }
     }
-//     computeThroughput(ret);
-// 
-// #ifdef MDVRBSP
-//     computeViolation(ret);
-// #endif
+    computeThroughput(ret);
+
+#ifdef MDVRBSP
+    computeViolation(ret);
+#endif
     return ret;
 }
 
@@ -1144,11 +1151,43 @@ void K_AddDrop(Solution &sol, int K) {
     }
 }
 
+void K_AddDrop2(Solution &sol, int K) {
+    K = min(K, int(sol.slots[0].spectrums[3].channels[0].connections.size()));
+    ti3 channelFrom = make_tuple(0, 3, 0);
+    vector<int> inserted, sizes;
+    for (int i = 0; i < K; i++) {
+        int idx = rng.randInt(sol.slots[0].spectrums[3].channels[0].connections.size() - 1);
+
+        Connection conn = Connection(sol.slots[0].spectrums[3].channels[0].connections[idx]);
+
+        int t = rng.randInt(sol.slots.size() - 1);
+        int a = rng.randInt(sol.slots[t].spectrums.size() - 1);
+        int b = rng.randInt(sol.slots[t].spectrums[a].channels.size() - 1);
+
+        int bw = sol.slots[t].spectrums[a].channels[b].bandwidth;
+        if (definitelyLessThan(dataRates[11][bToIdx(bw)], gma[conn.id])) {
+            i--;
+            continue;
+        }
+        
+        ti3 channelTo = make_tuple(t, a, b);
+
+#ifdef MDVRBSP
+        if (channelTo == channelFrom) {
+            i--;
+            continue;
+        }
+#endif
+
+        reinsert(sol, conn, channelFrom, channelTo, true);
+    }
+}
+
+
+
 void K_RemoveAndInserts(Solution &sol, int K) {
     int k = 0;
 
-    Solution copySol(sol);
-    // assert(is_feasible(sol, false));
     while (k < K) {
         int t = rng.randInt(sol.slots.size() - 1);
         int a = rng.randInt(sol.slots[t].spectrums.size() - 1);
@@ -1173,6 +1212,42 @@ void K_RemoveAndInserts(Solution &sol, int K) {
     K_AddDrop(sol, K);
 }
 
+void perturbation3(const Solution &inc, Solution &sol20, int K) {
+    vector<pair<Connection, tuple<int, int, int>>> conns;
+    for (int t = 0; t < inc.slots.size(); t++)
+        for (int s = 0; s < inc.slots[t].spectrums.size(); s++)
+            for (int c = 0; c < inc.slots[t].spectrums[s].channels.size(); c++)
+                for (int l = 0; l < inc.slots[t].spectrums[s].channels[c].connections.size(); l++)
+                    conns.emplace_back(make_pair(inc.slots[t].spectrums[s].channels[c].connections[l],
+                                                 make_tuple(-1, -1, -1)));
+
+    for (int t = 0; t < sol20.slots.size(); t++)
+        for (int s = 0; s < sol20.slots[t].spectrums.size(); s++)
+            for (int c = 0; c < sol20.slots[t].spectrums[s].channels.size(); c++)
+                for (int l = 0; l < sol20.slots[t].spectrums[s].channels[c].connections.size(); l++) {
+
+                    for (int x = 0; x < conns.size(); x++) {
+                        if (conns[x].first.id == sol20.slots[t].spectrums[s].channels[c].connections[l].id)
+                            conns[x].second = make_tuple(t, s, c);
+                    }
+                }
+
+    sort(conns.rbegin(), conns.rend(),
+         [](const pair<Connection, tuple<int, int, int>> &a,
+            const pair<Connection, tuple<int, int, int>> &b) {
+             return definitelyLessThan(a.first.violation, b.first.violation);
+         });
+
+    K = min(K, int(conns.size()));
+    for (int k = 0; k < K; k++) {
+        int t = get<0>(conns[k].second);
+        int a = get<1>(conns[k].second);
+        int b = get<2>(conns[k].second);
+        reinsert(sol20, conns[k].first, make_tuple(t, a, b), zeroChannel, true);
+    }
+    K_AddDrop(sol20, K);
+}
+
 double solve(int k, int i, int j) {
     inSolution[k][i][j] = true;
     double ret = chanOF[k][i][j];
@@ -1181,7 +1256,7 @@ double solve(int k, int i, int j) {
         double a2 = solve(k, i, child[k][i][j][1]);
 
 #ifdef MDVRBSP
-        if (definitelyLessThan(a1, ret) || definitelyLessThan(a2, ret)) {
+        if (definitelyLessThan(a1, ret) && definitelyLessThan(a2, ret)) {
             ret = min(a1, a2);
             inSolution[k][i][j] = false;
         }
@@ -1191,22 +1266,12 @@ double solve(int k, int i, int j) {
             inSolution[k][i][j] = false;
         }
 #endif
-
-// #ifdef MDVRBSP
-//         bool improved = a1 + a2 < ret;
-// #else
-//         bool improved = a1 + a2 > ret;
-// #endif
-//         if (improved) {
-//             ret = a1 + a2;
-//             inSolution[k][i][j] = false;
-//         }
     }
 
     return ret;
 }
 
-void setDP(const Solution &sol, bool ok = false) {
+void setDP(const Solution &sol) {
     memset(chanOF, 0, sizeof chanOF);
     memset(inSolution, false, sizeof inSolution);
 
@@ -1236,11 +1301,27 @@ void setDP(const Solution &sol, int t, int s) {
 }
 
 double calcDP(const Solution &sol, int t, int s) {
+#ifdef MDVRBSP
+    double OF = numeric_limits<double>::min();
+#else
     double OF = 0.0;
+#endif
+
     for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
+        if (approximatelyEqual(chanOF[t][s][c], 0.0)) {
+            inSolution[t][s][c] = true;
+            continue;
+        }
+
         if (parent[t][s][c] == -1) {
             double ret = solve(t, s, c);
+            // OF += ret;
+#ifndef MDVRBSP
             OF += ret;
+#else
+            // TODO: aqui eu so considero MINMAX
+            OF = max(OF, ret);
+#endif
         }
     }
 
@@ -1248,10 +1329,19 @@ double calcDP(const Solution &sol, int t, int s) {
 }
 
 double calcDP(const Solution &sol, bool ok = false) {
+#ifdef MDVRBSP
+    double OF = numeric_limits<double>::min();
+#else
     double OF = 0.0;
+#endif
     for (int t = 0; t < sol.slots.size(); t++) {
         for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
             for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
+                if (approximatelyEqual(chanOF[t][s][c], 0.0)) {
+                    inSolution[t][s][c] = true;
+                    continue;
+                }
+
                 if (parent[t][s][c] == -1) {
                     double ret = solve(t, s, c);
 #ifndef MDVRBSP
@@ -1367,10 +1457,9 @@ inline void addEverywhere(Solution &sol, int id) {
     }
 }
 
-Solution local_search(Solution &multiple, Solution &curr/*, const Solution &seila*/) {
+Solution local_search(Solution &mult, Solution &sol20) {
     bool improved = false;
 
-    int cnt = 0;
     do {
         improved = false;
 
@@ -1378,29 +1467,28 @@ Solution local_search(Solution &multiple, Solution &curr/*, const Solution &seil
         for (int i = 0; i < n_connections; i++)
             target.emplace_back(i);
 
-// #ifdef MDVRBSP
-//         if (of_opt == MINMAX) {
-//             target.clear();
-//             for (const TimeSlot &ts : seila.slots) {
-//                 for (const Spectrum &sp : ts.spectrums) {
-//                     for (const Channel &ch : sp.channels) {
-//                         for (const Connection &conn : ch.connections) {
-//                             if (approximatelyEqual(conn.violation, seila.violation)) {
-//                                 target.emplace_back(conn.id);
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-// #endif
-//         if (target.empty()) {
-//             assert(cnt > 0);
-//             return reconstruct_sol(multiple);
-//         }
-     // for (int i = 0; i < n_connections; i++) {
+#ifdef MDVRBSP
+        if (of_opt == MINMAX) {
+            target.clear();
+            for (const TimeSlot &ts : mult.slots) {
+                for (const Spectrum &sp : ts.spectrums) {
+                    for (const Channel &ch : sp.channels) {
+                        for (const Connection &conn : ch.connections) {
+                            if (approximatelyEqual(conn.violation, mult.violation)) {
+                                target.emplace_back(conn.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+#endif
+        if (target.empty()) {
+            return reconstruct_sol(mult);
+        }
+
         for (int i : target) {
-            Solution mult_clean(multiple);
+            Solution mult_clean(mult);
             removeAllOccurrences(mult_clean, i);
 
             Solution mult_cont(mult_clean);
@@ -1413,31 +1501,40 @@ Solution local_search(Solution &multiple, Solution &curr/*, const Solution &seil
 #endif
             ti3 best_ch = make_tuple(-1, -1, -1);
 
-            setDP(mult_clean);
-            // bestOF = calcDP(multiple);
-            double origOF = calcDP(multiple);
+            // setDP(mult_clean);
+            // double cleanOF = calcDP(mult);
 
-            for (int t = 0; t < curr.slots.size(); t++) {
-                for (int s = 0; s < curr.slots[t].spectrums.size(); s++) {
-                    for (int c = 0; c < curr.slots[t].spectrums[s].channels.size(); c++) {
-                        setDP(mult_clean, t, s);
-                        double AA = calcDP(multiple, t, s);
+            for (int t = 0; t < sol20.slots.size(); t++) {
+                for (int s = 0; s < sol20.slots[t].spectrums.size(); s++) {
+                    for (int c = 0; c < sol20.slots[t].spectrums[s].channels.size(); c++) {
+                        //                         setDP(mult_clean, t, s);
+                        //                         double AA = calcDP(mult, t, s);
+                        //
+                        //                         setDP(mult_clean, t, s);
+                        //                         int c_ch = c;
+                        //                         while (c_ch != -1) {
+                        // #ifdef MDVRBSP
+                        //                             chanOF[t][s][c_ch] =
+                        //                                 mult_cont.slots[t].spectrums[s].channels[c_ch].violation;
+                        // #else
+                        //                             chanOF[t][s][c_ch] =
+                        //                                 mult_cont.slots[t].spectrums[s].channels[c_ch].throughput;
+                        // #endif
+                        //                             c_ch = parent[t][s][c_ch];
+                        //                         }
+                        //
+                        //                         double BB = calcDP(mult, t, s);
+                        //                         double result = cleanOF - AA + BB;
 
-                        setDP(mult_clean, t, s);
+                        setDP(mult_clean);
                         int c_ch = c;
                         while (c_ch != -1) {
-#ifdef MDVRBSP
                             chanOF[t][s][c_ch] =
                                 mult_cont.slots[t].spectrums[s].channels[c_ch].violation;
-#else
-                            chanOF[t][s][c_ch] =
-                                mult_cont.slots[t].spectrums[s].channels[c_ch].throughput;
-#endif
                             c_ch = parent[t][s][c_ch];
                         }
 
-                        double BB = calcDP(multiple, t, s);
-                        double result = origOF - AA + BB;
+                        double result = calcDP(mult);
 
                         if (compareObjectives(result, bestOF) < 0) {
                             bestOF = result;
@@ -1448,34 +1545,38 @@ Solution local_search(Solution &multiple, Solution &curr/*, const Solution &seil
             }
 
 #ifdef MDVRBSP
-            int better = compareObjectives(bestOF, curr.violation);
+            int better = compareObjectives(bestOF, mult.violation);
 #else
-            int better = compareObjectives(bestOF, curr.throughput);
+            int better = compareObjectives(bestOF, mult.throughput);
 #endif
 
             if (better < 0 && best_ch != make_tuple(-1, -1, -1)) {
                 improved = true;
 #ifdef MDVRBSP
-                curr.violation = bestOF;
+                mult.violation = bestOF;
 #else
-                curr.throughput = bestOF;
+                mult.throughput = bestOF;
 #endif
-                multiple = mult_clean;
+                mult = mult_clean;
 
-                int new_t = get<0>(best_ch);
-                int new_sp = get<1>(best_ch);
-                int new_ch = get<2>(best_ch);
-                while (new_ch != -1) {
-                    multiple.slots[new_t].spectrums[new_sp].channels[new_ch] = insertInChannel(
-                        multiple.slots[new_t].spectrums[new_sp].channels[new_ch], i);
-                    new_ch = parent[new_t][new_sp][new_ch];
+                int nt = get<0>(best_ch);
+                int nsp = get<1>(best_ch);
+                int nch = get<2>(best_ch);
+                while (nch != -1) {
+                    mult.slots[nt].spectrums[nsp].channels[nch] =
+                        insertInChannel(mult.slots[nt].spectrums[nsp].channels[nch], i);
+                    nch = parent[nt][nsp][nch];
                 }
             }
         }
-        ++cnt;
+#ifdef MDVRBSP
+        if (approximatelyEqual(mult.violation, 0.0))
+            break;
+#endif
+
     } while (improved);
 
-    return reconstruct_sol(multiple);
+    return reconstruct_sol(mult);
 }
 
 void computeChannelsThroughput(vector<Channel> &channels) {
@@ -1530,11 +1631,73 @@ vector<Channel> split(Channel toSplit) {
         bestThroughputsoFar = bestThroughputIteration;
     }
     computeChannelsThroughput(ret);
+
+#ifdef MDVRBSP
+    for (auto &c : ret) {
+        double maior = 0.0;
+        for (auto &conn : c.connections) {
+            conn.violation = max(maior, gma[conn.id] - conn.throughput);
+        }
+        c.violation = maior;
+    }
+#endif
     assert(approximatelyEqual(ret[0].throughput + ret[1].throughput, bestThroughputsoFar));
     return ret;
 }
 
-inline void perturbation(Solution &sol, int kkmul) {
+struct ChanComparer {
+    bool operator()(const Channel &a, const Channel &b) const {
+        return definitelyLessThan(a.violation, b.violation);
+    }
+};
+
+void perturbation2(Solution &sol20, int K) {
+    vector<Connection> conns;
+    for (const auto &s : sol20.slots)
+        for (const auto &sp : s.spectrums)
+            for (const auto &ch : sp.channels)
+                for (const auto &link : ch.connections)
+                    if (definitelyGreaterThan(link.violation, 0.0))
+                        conns.emplace_back(link);
+
+    sort(conns.rbegin(), conns.rend(), [](const Connection &a, const Connection &b) {
+        return definitelyLessThan(a.violation, b.violation);
+    });
+
+    K = min(int(conns.size()), K);
+    int k = 0;
+    while (k < K) {
+        Connection to_rmv = conns[0];
+
+        bool ok = false;
+        int t, s, c, l;
+
+        for (t = 0; t < sol20.slots.size(); t++) {
+            for (s = 0; s < sol20.slots[t].spectrums.size(); s++) {
+                for (c = 0; c < sol20.slots[t].spectrums[s].channels.size(); c++) {
+                    for (l = 0; l < sol20.slots[t].spectrums[s].channels[c].connections.size();
+                         l++) {
+                        if (sol20.slots[t].spectrums[s].channels[c].connections[l].id ==
+                            to_rmv.id) {
+                            ok = true;
+                            goto fora;
+                        }
+                    }
+                }
+            }
+        }
+
+    fora:
+        assert(ok);
+        reinsert(sol20, to_rmv, make_tuple(t, s, c), zeroChannel, true);
+
+        conns.erase(conns.begin());
+        ++k;
+    }
+    K_AddDrop(sol20, K);
+}
+
+inline void perturbation(const Solution &inc, Solution &sol, int kkmul) {
 #ifndef MDVRBSP
     int rnd = rng.randInt(1);
     if (rnd)
@@ -1543,9 +1706,12 @@ inline void perturbation(Solution &sol, int kkmul) {
         K_RemoveAndInserts(sol, kkmul);
 
     fix_channels(sol);
-    rmvUnusedTS(sol);
+    // rmvUnusedTS(sol);
 #else
     K_RemoveAndInserts(sol, kkmul);
+
+    // perturbation2(sol, kkmul);
+    // perturbation3(inc, sol, kkmul);
 #endif
 }
 

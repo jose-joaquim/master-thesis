@@ -1,3 +1,4 @@
+//run 8 1 results/mdvrbsp_MINMAX_RANDOM/U_8 60 MINMAX RANDOM
 #include "VNS.h"
 
 bool is_feasible(const Solution &ret, bool retOption = true) {
@@ -40,6 +41,7 @@ bool is_feasible(const Solution &ret, bool retOption = true) {
 bool try_insert(int conn_id, Channel &ch) {
     ch = insertInChannel(ch, conn_id);
 
+    // return approximatelyEqual(ch.violation, 0.0);
     for (Connection &conn : ch.connections)
         if (definitelyLessThan(conn.throughput, gma[conn.id]))
             return false;
@@ -48,8 +50,12 @@ bool try_insert(int conn_id, Channel &ch) {
 }
 
 bool can_split(const Channel &ch) {
-    if (ch.bandwidth < 40)
+    if (ch.bandwidth <= 20)
         return false;
+
+    for (const auto &conn : ch.connections)
+        if (definitelyLessThan(dataRates[11][bToIdx(ch.bandwidth)], gma[conn.id]))
+            return false;
 
     Channel aux(ch.bandwidth / 2);
     for (auto &conn : ch.connections)
@@ -120,8 +126,13 @@ Solution constructive_heuristic(FILE *objImpF) {
                     }
 
                     if (can_split(ret.slots[t].spectrums[s].channels[c])) {
+                        assert(approximatelyEqual(ret.slots[t].spectrums[s].channels[c].violation,
+                                                  0.0));
                         vector<Channel> ch_split =
                             split(ret.slots[t].spectrums[s].channels[c]); // TODO
+
+                        assert(approximatelyEqual(ch_split[0].violation, 0.0));
+                        assert(approximatelyEqual(ch_split[1].violation, 0.0));
 
                         cp_channel = ch_split[0];
                         success = try_insert(conn, cp_channel);
@@ -225,7 +236,6 @@ Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = min(n_connections, 10);
-    bool first = true;
 
     while (!stop()) {
         int k = 1;
@@ -234,18 +244,14 @@ Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
             assert(delta.slots[0].spectrums[3].channels[0].connections.empty());
             delta = local_min;
 
-            perturbation(delta, k * K_MUL);
-            // computeViolation(delta);
+            perturbation(incumbent, delta, k * K_MUL);
 
             Solution multiple = multipleRepresentation(delta);
 
             setDP(multiple);
-            delta.violation = calcDP(multiple);
-            // auto seila = reconstruct_sol(multiple);
-            // checkVio(seila);
-
-            Solution explicit_sol = local_search(multiple, delta/*, seila*/);
-            checkVio(explicit_sol);
+            double largest = calcDP(multiple);
+            Solution explicit_sol = local_search(multiple, delta);
+            // checkVio(explicit_sol);
 
             if (essentiallyEqual(explicit_sol.violation, 0.0)) {
                 printf("found solution with violation 0.0!\n");
@@ -253,26 +259,26 @@ Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
                 return explicit_sol;
             }
 
-            computeViolation(delta);
+            // computeViolation(delta);
+            delta.violation = explicit_sol.violation;
             delta = convertTo20MhzSol(explicit_sol);
 
-            if (compareObjectives(delta, local_min) < 0 || first) {
-                first = false;
+            printf("%.3lf %.3lf\n", delta.violation, local_min.violation);
+            if (compareObjectives(delta, local_min) < 0) {
                 k = 1;
                 local_min = delta;
-                rmvUnusedTS(local_min);
+                // rmvUnusedTS(local_min);
             } else
                 k += 1;
 
-            if (compareObjectives(local_min, incumbent) < 0 || first) {
+            if (compareObjectives(local_min, incumbent) < 0) {
                 ++outerIter;
                 count_conn(explicit_sol);
                 double currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
 
-                first = false;
                 printf("%lf %.2lf %.2lf\n", currTime, local_min.violation, incumbent.violation);
                 incumbent = explicit_sol;
-                rmvUnusedTS(incumbent);
+                // rmvUnusedTS(incumbent);
             }
         }
     }
@@ -316,7 +322,7 @@ Solution reductionHeuristic(char **argv) {
             S1 = delete_time_slot(S1);
         }
 
-        rmvUnusedTS(S1);
+        // rmvUnusedTS(S1);
         if (yFeasible(S1) && S1.slots.size() == 1LU)
             return S1;
 

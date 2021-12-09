@@ -27,6 +27,7 @@ do
 
                 echo "./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} $of $ch"
                 ./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} ${of} ${ch}
+                # ./mdvrbsp_vns ${inst} ${v}
             done;
         done;
 
