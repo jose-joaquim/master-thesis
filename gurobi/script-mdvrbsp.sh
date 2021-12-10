@@ -15,7 +15,7 @@ do
 
     for inst in 64;
     do
-        var="mdvrbsp-quad"
+        var="mdvrbsp-bigm"
         path_results="results/${var}/U_"
         path_results_final=${path_results}${inst};
         echo $path_results_final

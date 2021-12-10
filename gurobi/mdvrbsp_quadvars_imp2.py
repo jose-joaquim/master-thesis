@@ -4,7 +4,7 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
-def defineModel(N, NTS, AFF, AUXNC, B, NOI, OVER, cToBIdx):
+def defineModel(N, NTS, AFF, AUXNC, B, NOI, OVER, cToBIdx, DR, GMM):
     m = gp.Model("mdvrbsp quadratic variables formulation")
 
     def variables():
@@ -17,6 +17,18 @@ def defineModel(N, NTS, AFF, AUXNC, B, NOI, OVER, cToBIdx):
         return t, x, I_, z, w
 
     def constraints(t, x, I_, z, w):
+        # 0
+        m.addConstrs(
+            (
+                x[i, c, t] == 0
+                for c in AUXNC
+                for i in range(N)
+                for t in range(NTS)
+                if DR[11][cToBIdx(c)] < GMM[i]
+            ),
+            "cant",
+        )
+
         # 1
         m.addConstrs((t[i + 1] <= t[i] for i in range(NTS - 1)), "ts")
 

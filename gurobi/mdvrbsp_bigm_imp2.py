@@ -7,7 +7,7 @@ import gurobipy as gp
 from gurobipy import GRB
 
 # connections, time-slots, big-M, affectance, channels dictionary
-def defineModel(N, NTS, BM, AFF, AUXNC, B, NOI, OVER, cToBIdx):
+def defineModel(N, NTS, BM, AFF, AUXNC, B, NOI, OVER, cToBIdx, DR, GMM):
     m = gp.Model("mdvrbsp reduced channels")
 
     def variables():
@@ -20,6 +20,18 @@ def defineModel(N, NTS, BM, AFF, AUXNC, B, NOI, OVER, cToBIdx):
         return t, x, I_, Iij, z
 
     def constraints(t, x, I_, Iij, z):
+        # 0
+        m.addConstrs(
+            (
+                x[i, c, t] == 0
+                for c in AUXNC
+                for i in range(N)
+                for t in range(NTS)
+                if DR[11][cToBIdx(c)] < GMM[i]
+            ),
+            "cant",
+        )
+
         # 1
         m.addConstrs((t[i + 1] <= t[i] for i in range(NTS - 1)), "ts")
 

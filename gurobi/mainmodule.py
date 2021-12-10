@@ -265,12 +265,12 @@ def initialize():
     gamma = [0 for i in range(U_n)]
 
     inst = sys.argv[2]
-    # p_type = "MD-VRBSP"
+    p_type = "MD-VRBSP"
     path = (
         "../instances/md-vrbsp/U_"
         + str(U_n)
         + "/"
-        # + p_type + "_"
+        + p_type + "_"
         + "U_"
         + str(U_n)
         + "_"
@@ -285,7 +285,7 @@ def initialize():
     )
 
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
-    return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR
+    return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, gamma
 
 
 def postProcess(m, x, I_, N, NTS, dic):
@@ -328,7 +328,7 @@ def computeBigM(nConnections, interferenceMatrix, distanceMatrix, AFF):
     return ret
 
 
-def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
+def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
     import gurobipy as gp
     from os.path import isfile
 
@@ -372,13 +372,15 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         x, y, I_ = {}, {}, {}
 
         if "mdvrbsp" in sys.argv[5]:
-            pw = (
-                "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
-                + str(N)
-                + "/solution"
-                + str(sys.argv[2])
-                + ".mst"
-            )
+            # pw = (
+            #     "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
+            #     + str(N)
+            #     + "/solution"
+            #     + str(sys.argv[2])
+            #     + ".mst"
+            # )
+
+            pw = '64.mst'
 
             if isfile(pw):
                 with open(pw, "r") as sol:
@@ -391,14 +393,14 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
                 BM = computeBigM(N, IM, DM, AFF)
                 print("CREATING MDVRBSP BIG-M MODEL")
                 m, x, I_ = mdBig.defineModel(
-                    N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx
+                    N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx, DR, GMM
                 )
             elif sys.argv[5] == "mdvrbsp-quad":
                 import mdvrbsp_quadvars_imp2 as mdQuad
 
                 print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
                 m, x, I_ = mdQuad.defineModel(
-                    N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx
+                    N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx, DR, GMM
                 )
 
             m.update()
@@ -442,12 +444,13 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
         else:
             file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
             m.Params.logFile = file_log
-            m.Params.logToConsole = 0
+            # m.Params.logToConsole = 0
             m.Params.timeLimit = 3600
             m.Params.intFeasTol = 1e-6
             m.Params.iisMethod = 1
 
         m.optimize()
+        # m.write('sol.sol')
         postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
@@ -458,6 +461,6 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, warm=False):
 
 
 if __name__ == "__main__":
-    N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR = initialize()
+    N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM = initialize()
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
-    opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR)
+    opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM)
