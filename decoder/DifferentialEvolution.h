@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <unordered_set>
-#include "BRKGA.h"
 
 extern const double LOWER_BOUND;
 extern const double UPPER_BOUND;

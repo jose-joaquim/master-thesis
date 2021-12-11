@@ -1,5 +1,6 @@
-#include "HeuristicDecoder.h"
 #include "DifferentialEvolution.h"
+#include "HeuristicDecoder.h"
+#include <chrono>
 
 using namespace std;
 
@@ -20,7 +21,7 @@ enum CROSSOVER_TYPE crossoverType;
 enum MUTATION_TYPE mutationType;
 Individual bestSolution;
 double maximumTime;
-clock_t startTime;
+std::chrono::steady_clock::time_point startTime;
 
 enum DE_VARIANT defineVariant(string __variant) {
     if (__variant == "DE_BEST_1_BIN") {
@@ -61,12 +62,12 @@ inline void printPopulation(const vector<Individual> aux) {
 
 bool isStoppingCriteriaReached() {
     if (stopCriteria == TIMELIMIT) {
-        return (((double) (clock() - startTime)) / CLOCKS_PER_SEC) >= maximumTime;
+        return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - startTime).count() >= maximumTime;
     } else if (stopCriteria == ITERATION) {
         return evaluations > maxEvaluations;
     }
 
-    return false; //TODO
+    return false; // TODO
 }
 
 vector<Individual> createInitialPopulation() {
@@ -82,7 +83,7 @@ vector<Individual> createInitialPopulation() {
     }
 
     return initialPop;
-};
+}
 
 void evaluatePopulation(vector<Individual> &population) {
     double MINOBJ = 1000000007;
@@ -90,7 +91,6 @@ void evaluatePopulation(vector<Individual> &population) {
         vector<double> variables(population[i].getVariables());
 
         double obj = decoder.decode(variables);
-//        printf("%.4lf\n", obj);
 
         population[i].setObjective(obj);
         if (obj < MINOBJ) {
@@ -102,7 +102,7 @@ void evaluatePopulation(vector<Individual> &population) {
 
 void initProgress() {
     if (stopCriteria == TIMELIMIT) {
-        startTime = clock();
+        startTime = std::chrono::high_resolution_clock::now();
     } else if (stopCriteria == ITERATION) {
         evaluations = populationSize;
     }
@@ -129,7 +129,7 @@ vector<Individual> selection(const vector<Individual> &solutionList) {
     return inds;
 }
 
-double mutate(vector<vector<double> > parent, int index) {
+double mutate(vector<vector<double>> parent, int index) {
     double value = -1000000007;
 
     if (mutationType == RAND) {
@@ -141,22 +141,23 @@ double mutate(vector<vector<double> > parent, int index) {
         }
     } else if (mutationType == BEST) {
         if (numberOfDifferenceVectors == 1) {
-            return bestSolution.getVariableValue(index) + f__ * (parent[0][index] - parent[1][index]);
+            return bestSolution.getVariableValue(index) +
+                   f__ * (parent[0][index] - parent[1][index]);
         } else if (numberOfDifferenceVectors == 2) {
-            return bestSolution.getVariableValue(index)
-                   + f__ * (parent[0][index] - parent[1][index])
-                   + f__ * (parent[2][index] - parent[3][index]);
+            return bestSolution.getVariableValue(index) +
+                   f__ * (parent[0][index] - parent[1][index]) +
+                   f__ * (parent[2][index] - parent[3][index]);
         }
     } else if (mutationType == RAND_TO_BEST) {
-        //TODO
+        // TODO
     }
 
     return value;
 }
 
-vector<Individual>
-crossover(const vector<Individual> &parentSolutions, Individual child) { //TODO: Maybe there is a bug here
-    vector<vector<double> > parent;
+vector<Individual> crossover(const vector<Individual> &parentSolutions,
+                             Individual child) { // TODO: Maybe there is a bug here
+    vector<vector<double>> parent;
 
     double requiredParents = 1 + numberOfDifferenceVectors * 2;
     assert(requiredParents == solutionsToSelect);
@@ -186,7 +187,7 @@ crossover(const vector<Individual> &parentSolutions, Individual child) { //TODO:
         } while (rng.rand() < cr__ && (l < numberVariables));
     }
 
-    //REPAIR BOUNDS
+    // REPAIR BOUNDS
     vector<double> childVariables = child.getVariables();
     for (int i = 0; i < childVariables.size(); i++) {
         double varValue = childVariables[i];
@@ -218,7 +219,8 @@ vector<Individual> reproduction(vector<Individual> matingPopulation) {
     return offspringPopulation;
 }
 
-vector<Individual> replacement(vector<Individual> &population, vector<Individual> &offspringPopulation) {
+vector<Individual> replacement(vector<Individual> &population,
+                               vector<Individual> &offspringPopulation) {
     assert(population.size() == offspringPopulation.size());
     vector<Individual> pop;
 
@@ -235,9 +237,7 @@ vector<Individual> replacement(vector<Individual> &population, vector<Individual
     return pop;
 }
 
-inline void updateProgress() {
-    evaluations += populationSize;
-}
+inline void updateProgress() { evaluations += populationSize; }
 
 vector<Individual> run() {
     vector<Individual> offspringPopulation;
@@ -257,136 +257,23 @@ vector<Individual> run() {
     return _population;
 }
 
-//variante, tempo limite, criterio de parada, objectiveFile, solutionFile, instanciaFile
-void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objectivesFile = nullptr) {
-#ifdef DEBUG_CLION //TODO: remind to remove the MACRO before real tests
-    puts("============== WITH DEBUG ==============");
-    freopen("/Users/joaquimnt_/git/vrbspheuristics/Instancias/D250x250/U_8/U_8_1.txt", "r", stdin);
-
-    maximumTime = 10;
+// variante, tempo limite, criterio de parada, objectiveFile, solutionFile, instanciaFile
+void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
     enum DE_VARIANT variant = BEST_1_BIN;
-#else
-    if (argc != 7) {
-        fprintf(stderr,
-                "wrong arguments. Provided %d, Must be: stdin, solutionFile, objectiveFile, timeLimit, variant, stop criteria\n",
-                argc);
-        exit(13);
-    }
 
-    const string openingFile(argv[1]);
-    if (!openingFile.empty()) {
-        fprintf(stderr, "trying to open input file %s\n", openingFile.c_str());
-        freopen(openingFile.c_str(), "r", stdin);
+    string path_input = "../instances/md-vrbsp/U_";
+    path_input += string(argv[1]) + "/U_";
+    // path_input += "/MD-VRBSP_U_";
+    path_input += string(argv[1]);
+    path_input += "_";
+    path_input += string(argv[2]);
+    path_input += ".txt";
+    if (!path_input.empty()) {
+        fprintf(stderr, "trying to open input file %s\n", path_input.c_str());
+        freopen(path_input.c_str(), "r", stdin);
     }
-
-    *solutionFile = fopen(argv[2], "a");
-    if (*solutionFile == nullptr) {
-        fprintf(stderr, "error opening solutionFile file\n");
-        exit(13);
-    }
-
-    *objectivesFile = fopen(argv[3], "a");
-    if (*objectivesFile == nullptr) {
-        fprintf(stderr, "error opening objectivesFile file\n");
-        exit(13);
-    }
-
-    stopCriteria = TIMELIMIT;
+    
     maximumTime = stoi(argv[4]);
-    enum DE_VARIANT variant = defineVariant(argv[5]);
-#endif
-
-    switch (variant) {
-        case RAND_1_BIN:
-        case RAND_1_EXP:
-        case BEST_1_BIN:
-        case BEST_1_EXP:
-        case RAND_TO_BEST_1_BIN:
-        case RAND_TO_BEST_1_EXP:
-        case CURRENT_TO_RAND_1_BIN:
-        case CURRENT_TO_RAND_1_EXP:
-            numberOfDifferenceVectors = 1;
-            break;
-        case RAND_2_BIN:
-        case RAND_2_EXP:
-        case BEST_2_BIN:
-        case BEST_2_EXP:
-            numberOfDifferenceVectors = 2;
-            break;
-        default:
-            fprintf(stderr, "ERROR IN VARIANT TYPE\n");
-            exit(-1);
-    }
-
-    switch (variant) {
-        case RAND_1_BIN:
-        case RAND_1_EXP:
-        case BEST_1_BIN:
-        case BEST_1_EXP:
-        case RAND_TO_BEST_1_BIN:
-        case RAND_TO_BEST_1_EXP:
-        case CURRENT_TO_RAND_1_BIN:
-        case CURRENT_TO_RAND_1_EXP:
-            solutionsToSelect = 3;
-            break;
-        case RAND_2_BIN:
-        case RAND_2_EXP:
-        case BEST_2_BIN:
-        case BEST_2_EXP:
-            solutionsToSelect = 5;
-            break;
-        default:
-            fprintf(stderr, "ERROR IN solutionsToSelect\n");
-            exit(-1);
-    }
-
-    switch (variant) {
-        case RAND_1_BIN:
-        case BEST_1_BIN:
-        case RAND_TO_BEST_1_BIN:
-        case CURRENT_TO_RAND_1_BIN:
-        case RAND_2_BIN:
-        case BEST_2_BIN:
-            crossoverType = BINARY;
-            break;
-        case RAND_1_EXP:
-        case BEST_1_EXP:
-        case RAND_TO_BEST_1_EXP:
-        case CURRENT_TO_RAND_1_EXP:
-        case RAND_2_EXP:
-        case BEST_2_EXP:
-            crossoverType = EXPONENTIAL;
-            break;
-        default:
-            fprintf(stderr, "ERROR IN CROSSOVER VARIANT\n");
-            exit(-1);
-    }
-
-    switch (variant) {
-        case RAND_1_BIN:
-        case RAND_1_EXP:
-        case RAND_2_BIN:
-        case RAND_2_EXP:
-            mutationType = RAND;
-            break;
-        case BEST_1_BIN:
-        case BEST_1_EXP:
-        case BEST_2_BIN:
-        case BEST_2_EXP:
-            mutationType = BEST;
-            break;
-        case CURRENT_TO_RAND_1_BIN:
-        case CURRENT_TO_RAND_1_EXP:
-            mutationType = CURRENT_TO_RAND;
-            break;
-        case RAND_TO_BEST_1_BIN:
-        case RAND_TO_BEST_1_EXP:
-            mutationType = RAND_TO_BEST;
-            break;
-        default:
-            fprintf(stderr, "ERROR IN MUTATION VARIANT\n");
-            exit(-1);
-    }
 
     if (stdin == nullptr) {
         fprintf(stderr, "error opening input file (stdin)\n");
@@ -395,23 +282,127 @@ void init(int argc, char **argv, FILE **solutionFile = nullptr, FILE **objective
 
     loadData();
     populationSize = 100;
-    numberVariables = 2 * nConnections;
+    // numberVariables = 2 * nConnections;
+    numberVariables = nConnections;    
 
-#ifdef DEBUG_CLION
-    fprintf(stdout, "[DIFFERENTIAL EVOLUTION variant %s] will execute for %lf seconds\n", "RAND_1_BIN", maximumTime);
-#else
-    fprintf(stdout, "[DIFFERENTIAL EVOLUTION variant %s] will execute for %lf seconds\n", argv[5], maximumTime);
-#endif
+    string solFile = string(string(argv[3])  + string("/solutionFile") + string(argv[2]) + string(".txt"));      
+    *solutionFile = fopen(solFile.c_str(), "w");
+
+    string objFile = string(string(argv[3]) + string("/objectives.txt"));
+    *objectivesFile = fopen(objFile.c_str(), "a");
+
+    stopCriteria = TIMELIMIT;
+    maximumTime = stoi(argv[4]);
+    // enum DE_VARIANT variant = defineVariant(argv[5]);
+
+    switch (variant) {
+    case RAND_1_BIN:
+    case RAND_1_EXP:
+    case BEST_1_BIN:
+    case BEST_1_EXP:
+    case RAND_TO_BEST_1_BIN:
+    case RAND_TO_BEST_1_EXP:
+    case CURRENT_TO_RAND_1_BIN:
+    case CURRENT_TO_RAND_1_EXP:
+        numberOfDifferenceVectors = 1;
+        break;
+    case RAND_2_BIN:
+    case RAND_2_EXP:
+    case BEST_2_BIN:
+    case BEST_2_EXP:
+        numberOfDifferenceVectors = 2;
+        break;
+    default:
+        fprintf(stderr, "ERROR IN VARIANT TYPE\n");
+        exit(-1);
+    }
+
+    switch (variant) {
+    case RAND_1_BIN:
+    case RAND_1_EXP:
+    case BEST_1_BIN:
+    case BEST_1_EXP:
+    case RAND_TO_BEST_1_BIN:
+    case RAND_TO_BEST_1_EXP:
+    case CURRENT_TO_RAND_1_BIN:
+    case CURRENT_TO_RAND_1_EXP:
+        solutionsToSelect = 3;
+        break;
+    case RAND_2_BIN:
+    case RAND_2_EXP:
+    case BEST_2_BIN:
+    case BEST_2_EXP:
+        solutionsToSelect = 5;
+        break;
+    default:
+        fprintf(stderr, "ERROR IN solutionsToSelect\n");
+        exit(-1);
+    }
+
+    switch (variant) {
+    case RAND_1_BIN:
+    case BEST_1_BIN:
+    case RAND_TO_BEST_1_BIN:
+    case CURRENT_TO_RAND_1_BIN:
+    case RAND_2_BIN:
+    case BEST_2_BIN:
+        crossoverType = BINARY;
+        break;
+    case RAND_1_EXP:
+    case BEST_1_EXP:
+    case RAND_TO_BEST_1_EXP:
+    case CURRENT_TO_RAND_1_EXP:
+    case RAND_2_EXP:
+    case BEST_2_EXP:
+        crossoverType = EXPONENTIAL;
+        break;
+    default:
+        fprintf(stderr, "ERROR IN CROSSOVER VARIANT\n");
+        exit(-1);
+    }
+
+    switch (variant) {
+    case RAND_1_BIN:
+    case RAND_1_EXP:
+    case RAND_2_BIN:
+    case RAND_2_EXP:
+        mutationType = RAND;
+        break;
+    case BEST_1_BIN:
+    case BEST_1_EXP:
+    case BEST_2_BIN:
+    case BEST_2_EXP:
+        mutationType = BEST;
+        break;
+    case CURRENT_TO_RAND_1_BIN:
+    case CURRENT_TO_RAND_1_EXP:
+        mutationType = CURRENT_TO_RAND;
+        break;
+    case RAND_TO_BEST_1_BIN:
+    case RAND_TO_BEST_1_EXP:
+        mutationType = RAND_TO_BEST;
+        break;
+    default:
+        fprintf(stderr, "ERROR IN MUTATION VARIANT\n");
+        exit(-1);
+    }
+
+    if (stdin == nullptr) {
+        fprintf(stderr, "error opening input file (stdin)\n");
+        exit(13);
+    }
+
+    fprintf(stdout, "[DIFFERENTIAL EVOLUTION variant %s] will execute for %lf seconds\n", argv[5],
+            maximumTime);
 }
 
-int main(int argc, char *argv[]) { //DE_RAND_1_BIN
+int main(int argc, char *argv[]) { // DE_RAND_1_BIN
     FILE *solutionFile = nullptr, *objectivesFile = nullptr;
     init(argc, argv, &solutionFile, &objectivesFile);
+
     vector<Individual> population = run();
     sort(population.begin(), population.end());
-#ifdef DEBUG_CLION
-    printf("%lf\n", population[0].getObjective());
-#else
+
     if (solutionFile != nullptr) {
         vector<double> ans = population[0].getVariables();
         for (int i = 0; i < ans.size(); i++) {
@@ -432,6 +423,5 @@ int main(int argc, char *argv[]) { //DE_RAND_1_BIN
 
     fclose(solutionFile);
     fclose(objectivesFile);
-#endif
     return 0;
 }
