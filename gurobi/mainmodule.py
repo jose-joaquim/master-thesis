@@ -270,7 +270,8 @@ def initialize():
         "../instances/md-vrbsp/U_"
         + str(U_n)
         + "/"
-        + p_type + "_"
+        + p_type
+        + "_"
         + "U_"
         + str(U_n)
         + "_"
@@ -372,17 +373,16 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         x, y, I_ = {}, {}, {}
 
         if "mdvrbsp" in sys.argv[5]:
-            # pw = (
-            #     "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
-            #     + str(N)
-            #     + "/solution"
-            #     + str(sys.argv[2])
-            #     + ".mst"
-            # )
-
-            pw = '64.mst'
+            pw = (
+                "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
+                + str(N)
+                + "/solution"
+                + str(sys.argv[2])
+                + ".mst"
+            )
 
             if isfile(pw):
+                print("found warm start solution")
                 with open(pw, "r") as sol:
                     NTS = int(sol.readline().split()[1])
                     print("new NTS is " + str(NTS))

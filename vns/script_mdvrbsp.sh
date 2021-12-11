@@ -13,7 +13,7 @@ lower=1
 upper=1
 for ((v=lower;v<=upper;v++));
 do
-    for inst in 128;
+    for inst in 64;
     do
         for of in "${arr_of[@]}";
         do
@@ -25,9 +25,9 @@ do
                 echo $path_var
                 mkdir -p $path_var
 
-                echo "./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} $of $ch"
-                ./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} ${of} ${ch}
-                # ./mdvrbsp_vns ${inst} ${v}
+                # echo "./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} $of $ch"
+                # ./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} ${of} ${ch}
+                ./mdvrbsp_vns ${inst} ${v} ${path_var}
             done;
         done;
 

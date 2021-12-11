@@ -429,7 +429,7 @@ int main(int argc, char **argv) {
     }
 
     // program_name, instance, version
-    if (argc == 3) {
+    if (argc == 4) {
         puts("executing only constructive heuristic and printing results...");
         Solution ch = constructive_heuristic(nullptr);
         printf("found solution with %lu time-slots\n", ch.slots.size());
@@ -439,6 +439,9 @@ int main(int argc, char **argv) {
         puts("setting parameters from the program arguments");
         of_opt = define_ofParam(string(argv[5]));
         ch_opt = define_chParam(string(argv[6]));
+    } else {
+        puts("argument error");
+        return 1;
     }
 
     maximumTime = stoi(argv[4]) * 1.0;
