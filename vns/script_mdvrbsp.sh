@@ -7,13 +7,13 @@ arr_ch=("RANDOM") # "GREEDY")
 
 path_results="results/mdvrbsp/U_"
 
-max_time=15
+max_time=60
 
 lower=1
 upper=1
 for ((v=lower;v<=upper;v++));
 do
-    for inst in 64;
+    for inst in 128;
     do
         for of in "${arr_of[@]}";
         do
@@ -25,8 +25,9 @@ do
                 echo $path_var
                 mkdir -p $path_var
 
-                echo "./mdvrbsp_vns ${inst} ${v} ${path_results_final} ${max_time} $of $ch"
+                echo "./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} $of $ch"
                 ./mdvrbsp_vns ${inst} ${v} ${path_var} ${max_time} ${of} ${ch}
+                # ./mdvrbsp_vns ${inst} ${v}
             done;
         done;
 
