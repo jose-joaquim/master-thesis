@@ -433,9 +433,7 @@ int main(int argc, char **argv) {
         puts("executing only constructive heuristic and printing results...");
         Solution ch = constructive_heuristic(nullptr);
         printf("found solution with %lu time-slots\n", ch.slots.size());
-        FILE *aux = fopen("../gurobi/warm.mst", "w");
-
-        print_solution_to_gurobi(ch, aux);
+        solution_gurobi(ch, argv);
         return 0;
     } else if (argc == 7) {
         puts("setting parameters from the program arguments");
