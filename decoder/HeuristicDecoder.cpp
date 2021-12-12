@@ -189,7 +189,6 @@ int bwIdx(int bw) {
     return 0;
 }
 
-
 double computeConnectionThroughput(Connection &conn, int bandwidth) {
     if (bandwidth == 0)
         return 0.0;
@@ -360,6 +359,25 @@ int convertChromoBandwidth(double value) {
     return 160;
 }
 
+// bool insertFreeChannel(Solution &sol, const int conn, const int bw, const vector<double> &vars,
+//                        int &usedSpec) {
+//     for (auto &slot : sol.slots) {
+//         for (auto &spec : slot.spectrums) {
+//             int free = spec.maxFrequency - spec.usedFrequency;
+// 
+//             if (free >= bw) {
+//                 spec.usedFrequency += bw;
+// 
+//                 auto ch = insertInChannel(Channel(bw), conn);
+//                 sol.throughput += ch.throughput;
+//                 return true;
+//             }
+//         }
+//     }
+// 
+//     return false;
+// }
+
 int insertFreeChannel(Solution &sol, int conn, int band, vector<double> &variables) {
     int freeSpec = 0, freeSpec2 = 0, idxSpectrum = -1, idxSlot = -1;
     int auxBw = -1;
@@ -424,6 +442,84 @@ int insertFreeChannel(Solution &sol, int conn, int band, vector<double> &variabl
     return auxBw;
 }
 
+void insertRemainingChannels(Solution &sol, const int conn, const int bw, vector<double> &vars) {
+    double bestOF = sol.throughput;
+
+    bool insert = false;
+    Channel newCh(bw), *oldCh = nullptr;
+    tuple<int, int, int> ch = {-1, -1, -1};
+
+    // for (int t = 0; t < int(sol.slots.size()); ++t) {
+    for (auto &slot : sol.slots) {
+        // for (int s = 0; s < sols.slots[t].spectrums.size(); ++s)
+        for (auto &spec : slot.spectrums) {
+            for (auto &ch : spec.channels) {
+                // for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); ++c) {
+                // const auto &ch = sol.slots[t].spectrums[s].channels[c];
+                auto auxCh = insertInChannel(ch, conn);
+
+                double auxOF = sol.throughput - ch.throughput + auxCh.throughput;
+
+                if (definitelyGreaterThan(auxOF, bestOF)) {
+                    insert = true;
+                    newCh = auxCh;
+                    oldCh = &ch;
+                    // ch = {t, s, c};
+                }
+            }
+        }
+    }
+
+    if (insert) {
+        sol.throughput = sol.throughput - oldCh->throughput + newCh.throughput;
+        *oldCh = newCh;
+
+        if (newCh.bandwidth != bw) {
+            switch (newCh.bandwidth) {
+            case 20:
+                vars[(conn * 2) + 1] = (0 + 0.25) / 2.0;
+                break;
+            case 40:
+                vars[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
+                break;
+            case 80:
+                vars[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
+                break;
+            case 160:
+                vars[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
+                break;
+            default:
+                exit(77);
+            }
+        }
+    }
+}
+
+bool insertBestFreeChannel(Solution &sol, const int conn, const int bw, vector<double> &vars,
+                           int &totUsed) {
+
+    Spectrum *spAdd = nullptr;
+    int maxFreq = -1;
+
+    for (auto &slot : sol.slots) {
+        for (auto &spec : slot.spectrums) {
+            int free = spec.maxFrequency - spec.usedFrequency;
+
+            if (free > maxFreq) {
+                spAdd = &spec;
+                free = maxFreq;
+            }
+        }
+    }
+
+    if (spAdd != nullptr) {
+        spAdd->channels.emplace_back(insertInChannel(Channel(maxFreq), conn));
+        return true;
+    }
+
+    return false;
+}
+
 void insertBestChannel(Solution &sol, int conn, int band, vector<double> &variables) {
     // TODO: remind to check the output of this function.
     double currentThroughput = sol.throughput, bestThroughputIteration = sol.throughput;
@@ -479,99 +575,7 @@ void insertBestChannel(Solution &sol, int conn, int band, vector<double> &variab
 }
 
 #ifdef MDVRBSP
-double buildMDVRBSPSolution(vector<double> variables, vector<int> permutation) {
-    // 1 - Checking that every (i, j) has the minimum bandwidth necessary to transmit
-    for (int i = 0; i < int(permutation.size()); i++) {
-        int bwIdx = bwIdx(convertChromoBandwidth(variables[permutation[idx] + 1]));
-        if (aproximatelyLess(dataRates[12][bwIdx], gma[i]))
-            return 1000000007;
-    }
-
-    // 2 - Build the solution
-    TimeSlot dummy_ts(init_conf);
-    Solution ret({dummy_ts});
-
-    for (int conn : permutation) {
-        bool success = false;
-        for (int t = 0; t < ret.slots.size(); t++) {
-            for (int s = 0; s < ret.slots[t].spectrums.size(); s++) {
-                if (success)
-                    break;
-
-                for (int c = 0; c < ret.slots[t].spectrums[s].channels.size(); c++) {
-                    if (make_tuple(t, s, c) == zeroChannel)
-                        continue;
-
-                    if (success)
-                        break;
-
-                    Channel cp_channel = ret.slots[t].spectrums[s].channels[c];
-                    success = try_insert(conn, cp_channel);
-
-                    if (success) {
-                        ret.slots[t].spectrums[s].channels[c] = cp_channel;
-                        break;
-                    }
-
-                    if (can_split(ret.slots[t].spectrums[s].channels[c])) {
-                        vector<Channel> ch_split =
-                            split(ret.slots[t].spectrums[s].channels[c]); // TODO
-
-                        cp_channel = ch_split[0];
-                        success = try_insert(conn, cp_channel);
-
-                        if (success) {
-                            swap(ret.slots[t].spectrums[s].channels[c],
-                                 ret.slots[t].spectrums[s].channels.back());
-                            ret.slots[t].spectrums[s].channels.pop_back();
-                            ret.slots[t].spectrums[s].channels.emplace_back(cp_channel);
-                            ret.slots[t].spectrums[s].channels.emplace_back(ch_split[1]);
-                            break;
-                        }
-
-                        cp_channel = ch_split[1];
-                        success = try_insert(conn, cp_channel);
-
-                        if (success) {
-                            swap(ret.slots[t].spectrums[s].channels[c],
-                                 ret.slots[t].spectrums[s].channels.back());
-                            ret.slots[t].spectrums[s].channels.pop_back();
-                            ret.slots[t].spectrums[s].channels.emplace_back(cp_channel);
-                            ret.slots[t].spectrums[s].channels.emplace_back(ch_split[0]);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!success) {
-                TimeSlot new_ts(dummy_ts);
-                for (int s = 0; s < new_ts.spectrums.size() && !success; s++) {
-                    for (int c = 0; c < new_ts.spectrums[s].channels.size() && !success; c++) {
-                        int bw = new_ts.spectrums[s].channels[c].bandwidth;
-                        if (bw >= 160) {
-                            Connection new_conn(conn);
-                            new_conn.SINR = 1000000007;
-                            new_conn.throughput = dataRates[11][bwIdx(bw)];
-                            new_ts.spectrums[s].channels[c].connections.push_back(new_conn);
-                            ret.slots.emplace_back(new_ts);
-                            success = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        computeThroughput(ret);
-    }
-
-    vector<Channel> aux;
-    aux.emplace_back(Channel());
-    ret.slots[0].spectrums.emplace_back(0, 0, aux);
-
-    computeThroughput(ret);
-    return ret.slots.size();
-}
+double buildMDVRBSPSolution(vector<double> variables, vector<int> permutation) { return -1; }
 #else
 double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
     int totalSpectrum = 160 + 240 + 100, totalUsedSpectrum = 0.0;
@@ -580,7 +584,7 @@ double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
     Spectrum spec1(160, 0, auxCh);
     Spectrum spec2(240, 0, auxCh);
     Spectrum spec3(100, 0, auxCh);
-    Solution sol({spec1, spec2, spec3}, 0.0, true);
+    Solution sol({spec1, spec2, spec3}, 0.0);
 
     // First, insert in free channels
     int idx = 0;
@@ -602,6 +606,46 @@ double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
     double throughput = sol.throughput;
     return -1.0 * throughput;
 }
+
+// double buildVRBSPSolution(vector<double> vars, vector<int> perm) {
+//     int totSpec = 500, totUsed = 0;
+// 
+//     vector<Channel> auxCh;
+//     Spectrum spec1(160, 0, auxCh);
+//     Spectrum spec2(240, 0, auxCh);
+//     Spectrum spec3(100, 0, auxCh);
+//     Solution sol({spec1, spec2, spec3}, 0.0);
+// 
+//     vector<int> leftOut;
+// 
+//     for (int i = 0; i < int(perm.size()) && totUsed < totSpec; ++i) {
+//         int conn = perm[i] / 2;
+//         int bw = convertChromoBandwidth(vars[perm[i] + 1]);
+// 
+//         if (!insertFreeChannel(sol, conn, bw, vars, totUsed))
+//             leftOut.emplace_back(perm[i]);
+//     }
+// 
+//     vector<int> leftOutAgain;
+//     if (totUsed < totSpec) {
+//         for (int i = 0; i < int(leftOut.size()) && totUsed < totSpec; ++i) {
+//             int conn = leftOut[i] / 2;
+//             int bw = convertChromoBandwidth(vars[leftOut[i] + 1]);
+// 
+//             if (!insertBestFreeChannel(sol, conn, bw, vars, totUsed))
+//                 leftOutAgain.emplace_back(leftOut[i]);
+//         }
+//     } else
+//         leftOutAgain = leftOut;
+// 
+//     for (int i = 0; i < int(leftOutAgain.size()); ++i) {
+//         int conn = leftOutAgain[i] / 2;
+//         int bw = convertChromoBandwidth(vars[leftOut[i] + 1]);
+// 
+//         insertRemainingChannels(sol, conn, bw, vars);
+//     }
+//     return -1.0 * sol.throughput;
+// }
 #endif
 
 double Solution::decode(std::vector<double> variables) const {

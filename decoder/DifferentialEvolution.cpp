@@ -282,13 +282,13 @@ void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
 
     loadData();
     populationSize = 100;
-    // numberVariables = 2 * nConnections;
-    numberVariables = nConnections;    
+    numberVariables = 2 * nConnections;
+    // numberVariables = nConnections;    
 
-    string solFile = string(string(argv[3])  + string("/solutionFile") + string(argv[2]) + string(".txt"));      
+    string solFile = string(string(argv[3])  + string("/solutionFile_de") + string(argv[2]) + string(".txt"));      
     *solutionFile = fopen(solFile.c_str(), "w");
 
-    string objFile = string(string(argv[3]) + string("/objectives.txt"));
+    string objFile = string(string(argv[3]) + string("/objectives_de.txt"));
     *objectivesFile = fopen(objFile.c_str(), "a");
 
     stopCriteria = TIMELIMIT;
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) { // DE_RAND_1_BIN
     sort(population.begin(), population.end());
 
     if (solutionFile != nullptr) {
-        vector<double> ans = population[0].getVariables();
+        vector<double> ans = bestSolution.getVariables();
         for (int i = 0; i < ans.size(); i++) {
             fprintf(solutionFile, "%lf ", ans[i]);
         }
@@ -415,7 +415,7 @@ int main(int argc, char *argv[]) { // DE_RAND_1_BIN
     }
 
     if (objectivesFile != nullptr) {
-        fprintf(objectivesFile, "%lf\n", population[0].getObjective());
+        fprintf(objectivesFile, "%lf %d\n", bestSolution.getObjective(), evaluations);
     } else {
         fprintf(stderr, "objectivesFiles is null!\n");
         exit(13);

@@ -50,6 +50,8 @@
 #include <stdexcept>
 #include "Population.h"
 
+int evaluations;
+
 template< class Decoder, class RNG >
 class BRKGA {
 public:
@@ -261,6 +263,7 @@ inline void BRKGA< Decoder, RNG >::initialize(const unsigned i) {
 		#pragma omp parallel for num_threads(MAX_THREADS)
 	#endif
 	for(int j = 0; j < int(p); ++j) {
+        ++evaluations;
 		current[i]->setFitness(j, refDecoder.decode((*current[i])(j)) );
 	}
 
@@ -315,6 +318,7 @@ inline void BRKGA< Decoder, RNG >::evolution(Population& curr, Population& next)
 		#pragma omp parallel for num_threads(MAX_THREADS)
 	#endif
 	for(int i = int(pe); i < int(p); ++i) {
+        ++evaluations;
 		next.setFitness( i, refDecoder.decode(next.population[i]) );
 	}
 

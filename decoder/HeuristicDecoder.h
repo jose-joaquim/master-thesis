@@ -193,7 +193,7 @@ class Solution {
     double throughput;
     double violation;
 
-    Solution(const vector<Spectrum> sp, double tot, bool flag) : throughput(tot) {
+    Solution(const vector<Spectrum> sp, double tot) : throughput(tot) {
         slots.emplace_back(sp);
         violation = 0.0;
     }

@@ -13,7 +13,7 @@ FILE *seila;
 void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
     string path_input = "../instances/md-vrbsp/U_";
     path_input += string(argv[1]) + "/U_";
-    // path_input += "/MD-VRBSP_U_";
+    //path_input += "/MD-VRBSP_U_";
     path_input += string(argv[1]);
     path_input += "_";
     path_input += string(argv[2]);
@@ -34,10 +34,10 @@ void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
     populationSize = 100;
     numberVariables = 2 * nConnections;
 
-    string solFile = string(string(argv[3])  + string("/solutionFile") + string(argv[2]) + string(".txt"));      
+    string solFile = string(string(argv[3])  + string("/solutionFile_brkga") + string(argv[2]) + string(".txt"));      
     *solutionFile = fopen(solFile.c_str(), "w");
 
-    string objFile = string(string(argv[3]) + string("/objectives.txt"));
+    string objFile = string(string(argv[3]) + string("/objectives_brkga.txt"));
     *objectivesFile = fopen(objFile.c_str(), "a");
 
     fprintf(stdout, "BRKGA will execute for %lf seconds\n", maximumTime);
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     }
 
     if (objectivesFile != nullptr) {
-        fprintf(objectivesFile, "%lf %d\n", -1.0 * algorithm.getBestFitness(), quantIteracoes);
+        fprintf(objectivesFile, "%lf %d\n", -1.0 * algorithm.getBestFitness(), evaluations);
     } else {
         fprintf(stderr, "objectivesFiles is null!\n");
         exit(13);
