@@ -263,7 +263,7 @@ Solution vns(Solution initial, FILE *objImpF, int &outerIter, int &impIter) {
             delta.violation = explicit_sol.violation;
             delta = convertTo20MhzSol(explicit_sol);
 
-            printf("%.3lf %.3lf\n", delta.violation, local_min.violation);
+            // printf("%.3lf %.3lf\n", delta.violation, local_min.violation);
             if (compareObjectives(delta, local_min) < 0) {
                 k = 1;
                 local_min = delta;

@@ -142,31 +142,35 @@ Solution vns(string filePrefix) {
     if (!filePrefix.empty())
         outFile = fopen(filePrefix.c_str(), "w");
 
-    Solution init_sol = constructive_heuristic(); // TODO (?)
-    // count_conn(init_sol);
-    Solution delta = convertTo20MhzSol(init_sol); // DONE
+    // Solution init_sol = constructive_heuristic(); // TODO (?)
+    // Solution delta = convertTo20MhzSol(init_sol); // DONE
+    // 
+    // Solution rep = multipleRepresentation(delta); // DONE
+    // setDP(rep);
+    // double retOF = calcDP(rep);
+    // 
+    // // Then, reconstruct optimal local solution
+    // Solution incumbent = reconstruct_sol(rep); // DONE
+    // incumbent.throughput = init_sol.throughput;
+    // 
+    // Solution local_max = incumbent;
+    // double old_value = incumbent.throughput;
 
-    Solution rep = multipleRepresentation(delta); // DONE
-    setDP(rep);
-    double retOF = calcDP(rep);
-
-    // Then, reconstruct optimal local solution
-    Solution incumbent = reconstruct_sol(rep); // DONE
-    incumbent.throughput = init_sol.throughput;
-
-    Solution local_max = incumbent;
-    double old_value = incumbent.throughput;
-    fprintf(outFile, "%.2lf %.2lf\n", 0.0, old_value);
+    auto incumbent = constructive_heuristic();
+    auto delta = convertTo20MhzSol(incumbent);
+    auto local_max = delta;
+    fprintf(outFile, "%.3lf %.3lf\n", 0.0, incumbent.throughput);
+    printf("%.3lf %.3lf\n", 0.0, incumbent.throughput);
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
     double currTime = 0.0;
-    startTime = clock();
+    start = high_resolution_clock::now();
     while (!stop()) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
             delta = local_max;
-            perturbation(delta, k * K_MUL); // DONE
+            perturbation(incumbent, delta, k * K_MUL); // DONE
 
             Solution multiple = multipleRepresentation(delta); // DONE
             setDP(multiple);
@@ -184,11 +188,11 @@ Solution vns(string filePrefix) {
                 k += 1;
 
             if (compareObjectives(local_max, incumbent) < 0) {
-                currTime = (((double)(clock() - startTime)) / CLOCKS_PER_SEC);
+                currTime = duration_cast<duration<double>>(high_resolution_clock::now() - start).count();
                 if (outFile != nullptr)
-                    fprintf(outFile, "%.3lf %.2lf\n", currTime, local_max.throughput);
+                    fprintf(outFile, "%.3lf %.3lf\n", currTime, local_max.throughput);
 
-                printf("%lf %lf %lf\n", currTime, incumbent.throughput, local_max.throughput);
+                printf("%.3lf %.3lf %.3lf\n", currTime, incumbent.throughput, local_max.throughput);
                 incumbent = explicit_sol;
             }
         }

@@ -444,7 +444,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         else:
             file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
             m.Params.logFile = file_log
-            # m.Params.logToConsole = 0
+            m.Params.logToConsole = 0
             m.Params.timeLimit = 3600
             m.Params.intFeasTol = 1e-6
             m.Params.iisMethod = 1

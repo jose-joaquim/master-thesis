@@ -7,7 +7,7 @@ path_results="results/vrbsp/U_"
 max_time=15
 
 lower=1
-upper=10
+upper=5
 for ((v=lower;v<=upper;v++));
 do
     for inst in 64;

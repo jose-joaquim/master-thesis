@@ -6,3 +6,7 @@
 **/*.ilp
 **/*~
 **/oldcode
+**/results*/
+**/*.dSYM
+**/__pycache__
+**/.ipynb_checkpoints
