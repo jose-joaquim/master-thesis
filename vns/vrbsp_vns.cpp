@@ -156,13 +156,14 @@ Solution vns(string filePrefix) {
     // Solution local_max = incumbent;
     // double old_value = incumbent.throughput;
 
+    auto ch_start = high_resolution_clock::now();
     auto incumbent = constructive_heuristic();
-    fprintf(outFile, "%.3lf %.3lf\n", duration_cast<duration<double>>(high_resolution_clock::now() - aux_start).count(), incumbent.throughput);
-
+    auto elapsed = duration_cast<duration<double>>(high_resolution_clock::now() - ch_start).count();
+    fprintf(outFile, "%.3lf %.3lf\n", elapsed, incumbent.throughput);
+    printf("%.3lf %.3lf\n", elapsed, incumbent.throughput);
+    
     auto delta = convertTo20MhzSol(incumbent);
     auto local_max = delta;
-    fprintf(outFile, "%.3lf %.3lf\n", 0.0, incumbent.throughput);
-    printf("%.3lf %.3lf\n", 0.0, incumbent.throughput);
 
     int K_MUL = max(1, n_connections / 100);
     int K_MAX = 10;
