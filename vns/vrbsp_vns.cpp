@@ -157,6 +157,8 @@ Solution vns(string filePrefix) {
     // double old_value = incumbent.throughput;
 
     auto incumbent = constructive_heuristic();
+    fprintf(outFile, "%.3lf %.3lf\n", duration_cast<duration<double>>(high_resolution_clock::now() - aux_start).count(), incumbent.throughput);
+
     auto delta = convertTo20MhzSol(incumbent);
     auto local_max = delta;
     fprintf(outFile, "%.3lf %.3lf\n", 0.0, incumbent.throughput);
