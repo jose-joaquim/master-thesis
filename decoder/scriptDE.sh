@@ -1,10 +1,9 @@
 #! /bin/bash
 
-make vrbsp
-# make vrcheck
+make de
 path_results="results/vrbsp/U_"
 
-max_time=600
+max_time=20
 
 lower=1
 upper=1
@@ -15,11 +14,7 @@ do
         path_results_final=${path_results}${inst};
         echo $path_results_final
         mkdir -p ${path_results_final}
-        echo "./vrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}"
-        ./vrbsp_vns ${inst} ${v} ${path_results_final} ${max_time}
-
-        # sol_file="solution.txt"
-        # ./check ${inst} ${v} ${sol_file}
+        echo "./decoder_de ${inst} ${v} ${path_results_final} ${max_time}"
+        ./decoder_de ${inst} ${v} ${path_results_final} ${max_time}
     done;
 done;
-

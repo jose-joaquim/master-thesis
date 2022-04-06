@@ -173,7 +173,7 @@ Solution vns(string filePrefix) {
         int k = 1;
         while (!stop() && k <= K_MAX) {
             delta = local_max;
-            perturbation(incumbent, delta, k * K_MUL); // DONE
+            perturbation(delta, k * K_MUL); // DONE
 
             Solution multiple = multipleRepresentation(delta); // DONE
             setDP(multiple);
