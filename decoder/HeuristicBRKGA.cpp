@@ -7,22 +7,21 @@ using namespace std;
 int populationSize;
 int numberVariables;
 double maximumTime;
-FILE *seila;
 
 // variante, tempo limite, criterio de parada, objectiveFile, solutionFile, instanciaFile
 void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
-    string path_input = "../instances/md-vrbsp/U_";
+    string path_input = "../instances/U_";
     path_input += string(argv[1]) + "/U_";
-    //path_input += "/MD-VRBSP_U_";
     path_input += string(argv[1]);
     path_input += "_";
     path_input += string(argv[2]);
     path_input += ".txt";
+
     if (!path_input.empty()) {
         fprintf(stderr, "trying to open input file %s\n", path_input.c_str());
         freopen(path_input.c_str(), "r", stdin);
     }
-    
+
     maximumTime = stoi(argv[4]);
 
     if (stdin == nullptr) {
