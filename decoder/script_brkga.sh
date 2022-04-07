@@ -1,9 +1,9 @@
 #! /bin/bash
 
 make brkga
-path_results="../results/vrbsp/U_"
+path_results="../results/brkga/vrbsp/U_"
 
-max_time=1
+max_time=10
 
 lower=1
 upper=1
