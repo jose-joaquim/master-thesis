@@ -270,6 +270,17 @@ int main(int argc, char **argv) {
                 model->get(GRB_DoubleAttr_NodeCount),
                 model->get(GRB_DoubleAttr_Runtime));
         fclose(result);
+
+        string res_sol = "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
+        FILE *sol = fopen(res_sol.c_str(), "2");
+
+        for (auto &var : x) {
+            const auto& [i, c, t] = var.first;
+            if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
+                fprintf(sol, "%d %d %d %lf\n", i, c, t, var.second.get(GRB_DoubleAttr_X));
+        }
+
+        fclose(sol);
     } else {
         model->set(GRB_IntParam_IISMethod, 1);
         model->computeIIS();
