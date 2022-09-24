@@ -219,22 +219,22 @@ inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
 
 int main(int argc, char **argv) {
     read_data();
-    // auto start = high_resolution_clock::now();
+    auto start = high_resolution_clock::now();
     GRBEnv env;
     GRBModel *model = new GRBModel(env);
     GRBVar *I, *t;
     mt3 x, Iij, z;
     // variables
-    // printf("variables...\n");
+    printf("variables...\n");
     var_x(model, x);
     var_z(model, z);
     var_Iij(model, Iij);
     var_I(model, I);
     var_t(model, t);
-
+    
     // constraints
     model->update();
-    // printf("constraints...\n");
+    printf("constraints...\n");
     symmetry1(model, t);
     symmetry2(model, x);
     unique(model, x);
@@ -244,13 +244,13 @@ int main(int argc, char **argv) {
     bigG(model, I, Iij, x);
     bigL(model, I, Iij, x);
     sinr(model, I, x);
-    // auto stop = high_resolution_clock::now();
-    // duration<double> ms_double = stop - start;
+    auto stop = high_resolution_clock::now();
+    duration<double> ms_double = stop - start;
     // cout << ms_double.count() << endl;
     // optimize
     model->update();
-    // model->write("seila.lp");
-    model->set(GRB_IntParam_LogToConsole, 0);
+    model->write("seila.lp");
+    // model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->optimize();
     
