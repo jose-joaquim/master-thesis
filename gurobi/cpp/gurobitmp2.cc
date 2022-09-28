@@ -246,11 +246,11 @@ int main(int argc, char **argv) {
     sinr(model, I, x);
     auto stop = high_resolution_clock::now();
     duration<double> ms_double = stop - start;
-    // cout << ms_double.count() << endl;
+    cout << ms_double.count() << endl;
     // optimize
     model->update();
-    model->write("seila.lp");
-    // model->set(GRB_IntParam_LogToConsole, 0);
+    // model->write("seila.lp");
+    model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->optimize();
     
@@ -258,11 +258,20 @@ int main(int argc, char **argv) {
         // model->write("sol.sol");
         string res = "result" + string(argv[1]);
         FILE *result = fopen(res.c_str(), "a");
+        double objVal = model->get(GRB_DoubleAttr_ObjVal);
+        double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
+        
+        if (approximatelyEqual(objVal, GRB_INFINITY * 1.0))
+            objVal = -1.0;
+
+        if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0))
+            dualObj = -1.0;
+
         fprintf(result,
                 "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n",
                 argv[2],
-                model->get(GRB_DoubleAttr_ObjVal),
-                model->get(GRB_DoubleAttr_ObjBoundC),
+                objVal,
+                dualObj,
                 model->get(GRB_DoubleAttr_MIPGap),
                 model->get(GRB_IntAttr_NumVars),
                 model->get(GRB_IntAttr_NumConstrs),
@@ -270,16 +279,16 @@ int main(int argc, char **argv) {
                 model->get(GRB_DoubleAttr_NodeCount),
                 model->get(GRB_DoubleAttr_Runtime));
         fclose(result);
-
+    
         string res_sol = "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
-        FILE *sol = fopen(res_sol.c_str(), "2");
-
+        FILE *sol = fopen(res_sol.c_str(), "w");
+    
         for (auto &var : x) {
             const auto& [i, c, t] = var.first;
             if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
                 fprintf(sol, "%d %d %d %lf\n", i, c, t, var.second.get(GRB_DoubleAttr_X));
         }
-
+    
         fclose(sol);
     } else {
         model->set(GRB_IntParam_IISMethod, 1);
