@@ -43,8 +43,6 @@ static const int MAX_CHANNELS = 45;
 static const int MAX_SLOTS = 2048;
 static double maximumTime;
 
-static high_resolution_clock::time_point start;
-
 static vector<double> GMM, BM;
 
 random_device rd;
@@ -832,9 +830,9 @@ void read_data() {
   }
 
   initTimeSlot();
+#ifdef MDVRBSP
   printf("%d %d\n", avgNts(), CH());
   // T = avgNts();
-#ifdef MDVRBSP
   T = CH();
   cout << T << endl;
 #endif

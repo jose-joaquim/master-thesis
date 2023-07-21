@@ -1,8 +1,8 @@
 #!/bin/sh
 
-U=8
+U=64
 
-for i in {1..30};
+for i in {29..29};
 do
-  ./out ${U} ${i} < ../../instances/U_${U}/MD-VRBSP_U_${U}_${i}.txt > /dev/null
+  ./out ${U} ${i} ../../../instances/U_${U}/MD-VRBSP_U_${U}_${i}.txt
 done

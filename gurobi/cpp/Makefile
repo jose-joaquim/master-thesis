@@ -8,4 +8,5 @@ v2:
 	g++ -std=c++2a -o out gurobitmp2.cc -I$(GUROBI_INC) -L$(GUROBI_HOME)/lib -lgurobi100 -lgurobi_c++
 
 vrbsp:
-	g++ -std=c++2a -o out vrbsp.cc -I$(GUROBI_INC) -L$(GUROBI_HOME)/lib -lgurobi100 -lgurobi_c++
+	mkdir bin
+	g++ -std=c++2a -g -o bin/out vrbsp.cc -I$(GUROBI_INC) -L$(GUROBI_HOME)/lib -lgurobi100 -lgurobi_c++
