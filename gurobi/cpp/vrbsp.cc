@@ -293,9 +293,9 @@ int main(int argc, char **argv) {
       if (model->get(GRB_IntAttr_Status) == GRB_INFEASIBLE) {
         model->computeIIS();
         model->write("why.ilp");
+        return 0;
       }
-
-      return 0;
+      OF = -1;
     }
 
     auto finish = std::chrono::steady_clock::now();

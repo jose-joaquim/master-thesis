@@ -2,7 +2,7 @@
 
 U=64
 
-for i in {29..29};
+for i in {1..1};
 do
-  ./out ${U} ${i} ../../../instances/U_${U}/MD-VRBSP_U_${U}_${i}.txt
+  ./bin/out ${U} ${i} ../../instances/U_${U}/MD-VRBSP_U_${U}_${i}.txt
 done
