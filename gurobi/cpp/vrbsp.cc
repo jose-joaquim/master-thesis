@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <tuple>
@@ -267,14 +268,14 @@ int main(int argc, char **argv) {
     sinr(model, I, x, l_to_idx);
     // optimize
 
-    model->set(GRB_DoubleParam_TimeLimit, 3600.0 - elapsed);
+    model->set(GRB_DoubleParam_TimeLimit, min(1200.0, 3600.0 - elapsed));
     model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
     model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->update();
     model->optimize();
 
-    if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
+    if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
       bool at_least_one = false;
       for (auto seila : x) {
         auto &[i, c] = seila.first;
@@ -312,7 +313,7 @@ int main(int argc, char **argv) {
 
   fclose(solFile);
   FILE *obj = fopen("obj", "a");
-  fprintf(obj, "%d %.3lf\n", OF, elapsed);
+  fprintf(obj, "%s\t%d\t%.3lf\n", argv[2], OF, elapsed);
 
   fclose(obj);
   return 0;
