@@ -228,6 +228,7 @@ inline void sinr(GRBModel *model, GRBVar *I, mt2 &x, vector<int> &conns) {
 
 int main(int argc, char **argv) {
   freopen(argv[3], "r", stdin);
+  printf("opening %s\n", argv[3]);
   read_data();
   set<int> scheduled;
   int off = N, OF = 0;
@@ -268,9 +269,10 @@ int main(int argc, char **argv) {
     sinr(model, I, x, l_to_idx);
     // optimize
 
-    model->set(GRB_DoubleParam_TimeLimit, min(1200.0, 3600.0 - elapsed));
+    model->set(GRB_DoubleParam_TimeLimit,
+               min(600.0, max(0.0, 3600.0 - elapsed)));
     model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
-    model->set(GRB_IntParam_LogToConsole, 0);
+    // model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->update();
     model->optimize();
@@ -290,13 +292,13 @@ int main(int argc, char **argv) {
       // cout << "off is " << off << endl;
       assert(at_least_one);
     } else {
-      cout << "ops!" << endl;
       if (model->get(GRB_IntAttr_Status) == GRB_INFEASIBLE) {
         model->computeIIS();
         model->write("why.ilp");
-        return 0;
       }
+      cout << "ops!" << endl;
       OF = -1;
+      break;
     }
 
     auto finish = std::chrono::steady_clock::now();
@@ -306,15 +308,18 @@ int main(int argc, char **argv) {
             .count();
 
     elapsed += elapsed_seconds;
+
     cout << "fooo " << elapsed_seconds << endl;
+    if (elapsed > 3605) {
+      cout << "time limit" << endl;
+      break;
+    }
   }
 
-  assert(off == 0);
-
   fclose(solFile);
+
   FILE *obj = fopen("obj", "a");
   fprintf(obj, "%s\t%d\t%.3lf\n", argv[2], OF, elapsed);
-
   fclose(obj);
   return 0;
 }
