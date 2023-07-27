@@ -23,11 +23,13 @@ vector<vector<int>> C_b = {
 };
 
 bool canTransmitUsingChannel(int i, int c) {
-  return definitelyGreaterThan(DR[11][cToBIdx(c)], GMM[i]);
+  return definitelyGreaterThan(DR[11][cToBIdx(c)], GMM[i]) ||
+         approximatelyEqual(DR[11][cToBIdx(c)], GMM[i]);
 }
 
 bool canTransmitUsingBandwidth(int i, int b, int m) {
-  return definitelyGreaterThan(DR[m][b], GMM[i]);
+  return definitelyGreaterThan(DR[m][b], GMM[i]) ||
+         approximatelyEqual(DR[m][b], GMM[i]);
 }
 
 // -------------- variables --------------------
