@@ -1338,7 +1338,8 @@ void computeChannelsThroughput(vector<Channel> &channels) {
   }
 }
 
-vector<Channel> split(Channel toSplit) {
+optional<vector<Channel>> split(Channel toSplit,
+                                vector<double> *GMA = nullptr) {
   int newBw = toSplit.bandwidth / 2;
   vector<Channel> ret;
   ret.emplace_back(Channel(0.0, 0.0, 0.0, newBw, vector<Connection>()));
@@ -1379,6 +1380,13 @@ vector<Channel> split(Channel toSplit) {
 
   assert(approximatelyEqual(ret[0].throughput + ret[1].throughput,
                             bestThroughputsoFar));
+
+  if (GMA != nullptr)
+    for (const auto &ch : ret)
+      for (const auto &conn : ch.connections)
+        if (definitelyLessThan(conn.throughput, (*GMA)[conn.id]))
+          return nullopt;
+
   return ret;
 }
 
@@ -1475,7 +1483,7 @@ Solution CH_VRBSP() {
       for (int c = 0; c < ret(0, s).channels.size(); ++c) {
         Solution s1, s2, s3;
 
-        vector<Channel> channels = split(ret(0, s, c));
+        vector<Channel> channels = *split(ret(0, s, c));
 
         Solution *aux[] = {&tmp, &s1, &s2, &s3};
         tmp = **max_element(begin(aux), end(aux), [](Solution *a, Solution *b) {

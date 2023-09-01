@@ -47,14 +47,11 @@ Solution DTS(const Solution sol) { return {}; }
 Solution VNS(Solution sol) { return {}; }
 
 bool mdvrbsp_feasible(const Solution &ret) {
-  int cnt = 0;
   set<int> scheduled;
-  for (const TimeSlot &ts : ret.slots) {
-    for (const Spectrum &sp : ts.spectrums) {
-      for (const Channel &ch : sp.channels) {
+  for (const TimeSlot &ts : ret.slots)
+    for (const Spectrum &sp : ts.spectrums)
+      for (const Channel &ch : sp.channels)
         for (const Connection &conn : ch.connections) {
-          // printf("conn %d\n", conn.id);
-          cnt += 1;
           scheduled.insert(conn.id);
           if (definitelyLessThan(conn.throughput, GMA[conn.id])) {
             printf("ops... conn %d %lf %lf\n", conn.id, conn.throughput,
@@ -62,17 +59,8 @@ bool mdvrbsp_feasible(const Solution &ret) {
             return false;
           }
         }
-      }
-    }
-  }
 
-  if (cnt != n_connections) {
-    for (auto x : scheduled) printf("%d ", x);
-
-    puts("");
-  }
-
-  return cnt >= n_connections;
+  return true;
 }
 
 Solution reductionHeuristic(char **argv) {
@@ -127,7 +115,8 @@ bool can_split(const Channel &ch) {
   if (ch.bandwidth <= 20) return false;
 
   for (const auto &conn : ch.connections)
-    if (definitelyLessThan(dataRates[11][bToIdx(ch.bandwidth)], GMA[conn.id]))
+    if (definitelyLessThan(dataRates[11][bToIdx(ch.bandwidth / 2)],
+                           GMA[conn.id]))
       return false;
 
   Channel aux(ch.bandwidth / 2);
@@ -146,11 +135,9 @@ Solution CH() {
   shuffle(links.begin(), links.end(), whatever);
 
   for (int conn : links) {
-    for (int t = 0; t < ret.slots.size(); t++) {
-      for (int s = 0; s < ret(t).spectrums.size(); s++) {
+    for (int t = 0; t < ret.slots.size(); t++)
+      for (int s = 0; s < ret(t).spectrums.size(); s++)
         for (int c = 0; c < ret(t, s).channels.size(); c++) {
-          if (make_tuple(t, s, c) == zeroChannel) continue;
-
           auto rst = try_insert(conn, ret(t, s, c));
 
           if (rst) {
@@ -159,23 +146,23 @@ Solution CH() {
           }
 
           if (can_split(ret(t, s, c))) {
-            vector<Channel> ch_split = split(ret(t, s, c));
+            auto ch_split = split(ret(t, s, c), &GMA);
 
-            for (int i = 0; i < ch_split.size(); ++i) {
-              auto cp_channel = try_insert(conn, ch_split[i]);
+            if (!ch_split) continue;
+
+            for (int i = 0; i < ch_split->size(); ++i) {
+              auto cp_channel = try_insert(conn, (*ch_split)[i]);
 
               if (cp_channel) {
                 swap(ret(t, s, c), ret(t, s).channels.back());
                 ret(t, s).channels.pop_back();
                 ret(t, s).channels.emplace_back(*cp_channel);
-                ret(t, s).channels.emplace_back(ch_split[i == 0]);
+                ret(t, s).channels.emplace_back((*ch_split)[i == 0]);
                 goto NEXT_CONN;
               }
             }
           }
         }
-      }
-    }
 
     {
       TimeSlot new_ts{dummy_ts};
@@ -204,7 +191,6 @@ Solution CH() {
   ret.slots[0].spectrums.emplace_back(0, 0, aux);
 
   computeThroughput(ret);
-
   assert(mdvrbsp_feasible(ret));
   return ret;
 }
@@ -213,8 +199,15 @@ int main(int argc, char **argv) {
   freopen(argv[3], "r", stdin);
   read_data(GMA);
 
+  auto start = std::chrono::steady_clock::now();
   Solution inc = CH();
-  cout << inc.slots.size() << endl;
+  auto finish = std::chrono::steady_clock::now();
+  double elapsed_seconds =
+      std::chrono::duration_cast<std::chrono::duration<double>>(finish - start)
+          .count();
+
+  cout << argv[2] << "\t" << inc.slots.size() << "\t" << elapsed_seconds
+       << endl;
 
   string fsol_s = "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
   FILE *fileSol = fopen(fsol_s.c_str(), "w");
