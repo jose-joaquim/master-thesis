@@ -1,8 +1,5 @@
-vns:
-	g++ -Wall -std=c++11 VNS.h
-
 vrbsp:
-	g++ -Wall -std=c++2a -g -o vrbsp_vns vrbsp_vns.cpp
+	g++ -Wall -std=c++2a -g -o out vrbsp.cpp common.cc
 
 mdvrbsp:
 	mkdir -p bin

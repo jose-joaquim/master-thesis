@@ -115,7 +115,7 @@ bool can_split(const Channel &ch) {
   if (ch.bandwidth <= 20) return false;
 
   for (const auto &conn : ch.connections)
-    if (definitelyLessThan(dataRates[11][bToIdx(ch.bandwidth / 2)],
+    if (definitelyLessThan(dataRates[11][bwIdx(ch.bandwidth / 2)],
                            GMA[conn.id]))
       return false;
 
