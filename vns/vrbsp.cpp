@@ -10,6 +10,8 @@ Solution vns(string filePrefix) {
   auto ch_start = high_resolution_clock::now();
   Solution incumbent = CH_VRBSP();
 
+  incumbent(0).spectrums.emplace_back(Spectrum(0, 0, {Channel(0)}));
+
   // auto elapsed =
   //     duration_cast<duration<double>>(high_resolution_clock::now() -
   //     ch_start)
@@ -33,8 +35,6 @@ Solution vns(string filePrefix) {
       Solution multiple = multipleRepresentation(delta);
       setDP(multiple);
       delta.throughput = calcDP(multiple);
-
-      exit(10);
 
       Solution explicit_sol = local_search(multiple, delta);
       fix_channels(explicit_sol);

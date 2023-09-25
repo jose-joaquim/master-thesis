@@ -198,6 +198,7 @@ void K_RemoveAndInserts(Solution &sol, int K) {
     k++;
   }
 
+  assert(!sol(0, 3, 0).connections.empty());
   K_AddDrop(sol, K);
 }
 
@@ -302,8 +303,8 @@ Solution multipleRepresentation(Solution ret) {
       }
     }
   }
-  computeThroughput(ret);
 
+  computeThroughput(ret);
   return ret;
 }
 
@@ -338,13 +339,10 @@ void setDP(Solution &sol) {
   memset(chanOF, 0, sizeof chanOF);
   memset(inSolution, false, sizeof inSolution);
 
-  for (int t = 0; t < sol.slots.size(); t++) {
-    for (int s = 0; s < sol(t).spectrums.size(); s++) {
-      for (int c = 0; c < sol(t, s).channels.size(); c++) {
+  for (int t = 0; t < sol.slots.size(); t++)
+    for (int s = 0; s < sol(t).spectrums.size(); s++)
+      for (int c = 0; c < sol(t, s).channels.size(); c++)
         chanOF[t][s][c] = sol(t, s, c).throughput;
-      }
-    }
-  }
 }
 
 void setDP(Solution &sol, int t, int s) {
@@ -386,8 +384,8 @@ double calcDP(Solution &sol) {
 }
 
 void removeAllOccurrences(Solution &sol, int id) {
-  for (int t = 0; t < sol.slots.size(); t++) {
-    for (int s = 0; s < sol(t).spectrums.size(); s++) {
+  for (int t = 0; t < sol.slots.size(); t++)
+    for (int s = 0; s < sol(t).spectrums.size(); s++)
       for (int c = 0; c < sol(t, s).channels.size(); c++) {
         Channel &chan = sol(t, s, c);
         for (const Connection &conn : chan.connections) {
@@ -397,24 +395,20 @@ void removeAllOccurrences(Solution &sol, int id) {
           }
         }
       }
-    }
-  }
 }
 
 void addEverywhere(Solution &sol, int id) {
-  for (int t = 0; t < sol.slots.size(); t++) {
-    for (int s = 0; s < sol(t).spectrums.size(); s++) {
+  for (int t = 0; t < sol.slots.size(); t++)
+    for (int s = 0; s < sol(t).spectrums.size(); s++)
       for (int c = 0; c < sol(t, s).channels.size(); c++) {
         Channel &ch = sol(t, s, c);
         ch = insertInChannel(ch, id);
       }
-    }
-  }
 }
 
 Solution local_search(Solution &mult, Solution &sol20) {
   bool improved = false;
-  auto dp = [](const Solution &s) -> double { return s.throughput; };
+  double highest = sol20.throughput;
 
   do {
     improved = false;
@@ -429,7 +423,7 @@ Solution local_search(Solution &mult, Solution &sol20) {
       Solution mult_cont(mult_clean);
       addEverywhere(mult_cont, i);
 
-      double bestOF = -1.0;
+      double bestOF = highest;
       ti3 best_ch = {-1, -1, -1};
 
       setDP(mult_clean);
@@ -438,35 +432,45 @@ Solution local_search(Solution &mult, Solution &sol20) {
       for (int t = 0; t < sol20.slots.size(); t++)
         for (int s = 0; s < sol20(t).spectrums.size(); s++)
           for (int c = 0; c < sol20(t, s).channels.size(); c++) {
-            setDP(mult_clean, t, s);
-            double AA = calcDP(mult, t, s);
-
-            setDP(mult_clean, t, s);
+            setDP(mult_clean);
             int c_ch = c;
+
             while (c_ch != -1) {
               chanOF[t][s][c_ch] = mult_cont(t, s, c_ch).throughput;
               c_ch = parent[t][s][c_ch];
             }
 
-            double BB = calcDP(mult, t, s);
-            double result = cleanOF - AA + BB;
-
-            if (compareObjectives(result, bestOF) < 0) {
-              bestOF = result;
+            double ans = calcDP(mult);
+            if (compareObjectives(ans, bestOF) < 0) {
+              bestOF = ans;
               best_ch = {t, s, c};
             }
+            // setDP(mult_clean, t, s);
+            // double AA = calcDP(mult, t, s);
+            //
+            // setDP(mult_clean, t, s);
+            // int c_ch = c;
+            // while (c_ch != -1) {
+            //   chanOF[t][s][c_ch] = mult_cont(t, s, c_ch).throughput;
+            //   c_ch = parent[t][s][c_ch];
+            // }
+            //
+            // double BB = calcDP(mult, t, s);
+            // double result = cleanOF - AA + BB;
+            //
+            // if (compareObjectives(result, bestOF) < 0) {
+            //   bestOF = result;
+            //   best_ch = {t, s, c};
+            // }
           }
 
-      int better = compareObjectives(bestOF, dp(mult));
+      int better = compareObjectives(bestOF, highest);
       if (better < 0 && best_ch != make_tuple(-1, -1, -1)) {
         improved = true;
+        highest = bestOF;
 
-        int aux = dp(mult);
         mult = mult_clean;
-        mult.throughput = aux;
-
         auto &[nt, nsp, nch] = best_ch;
-
         while (nch != -1) {
           mult(nt, nsp).channels[nch] = insertInChannel(mult(nt, nsp, nch), i);
           nch = parent[nt][nsp][nch];
@@ -476,7 +480,12 @@ Solution local_search(Solution &mult, Solution &sol20) {
 
   } while (improved);
 
-  return reconstruct_sol(mult);
+  setDP(mult);
+  calcDP(mult);
+
+  Solution ret = reconstruct_sol(mult);
+  assert(approximatelyEqual(ret.throughput, highest));
+  return ret;
 }
 
 double computeConnectionThroughput(Connection &conn, int bandwidth) {
@@ -833,7 +842,7 @@ Solution CH_VRBSP() {
       for (int c = 0; c < ret(0, s).channels.size(); ++c) {
         Channel c1 = insertInChannel(ret(0, s, c), links[i]);
 
-        Solution s1 = tmp;
+        Solution s1 = ret;
         s1(0, s, c) = c1;
 
         optional<vector<Channel>> opt_channels = *split2(ret(0, s, c));
@@ -843,11 +852,11 @@ Solution CH_VRBSP() {
           Channel c2 = insertInChannel(channels[0], links[i]);
           Channel c3 = insertInChannel(channels[1], links[i]);
 
-          Solution s2 = tmp;
+          Solution s2 = ret;
           s2(0, s, c) = c2;
           s2(0, s).channels.emplace_back(channels[1]);
 
-          Solution s3 = tmp;
+          Solution s3 = ret;
           s3(0, s, c) = c3;
           s3(0, s).channels.emplace_back(channels[0]);
 
@@ -863,6 +872,15 @@ Solution CH_VRBSP() {
       }
 
     ret = tmp;
+
+    set<int> seen;
+    for (const auto &ts : ret.slots)
+      for (const auto &sp : ts.spectrums)
+        for (const auto &ch : sp.channels)
+          for (const auto &conn : ch.connections) {
+            assert(seen.find(conn.id) == seen.end());
+            seen.insert(conn.id);
+          }
   }
 
   return ret;
