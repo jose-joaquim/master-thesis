@@ -213,20 +213,50 @@ inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
   }
 }
 
+inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
+  for (const auto &[key_x, var_x] : x) {
+    const auto &[l_x, c_x, t_x] = key_x;
+
+    for (int k = 0; k < N; ++k) {
+      if (l_x == k) continue;
+
+      int bw_idx = cToBIdx(c_x);
+      double aff = B[l_x][bw_idx] * AFF[k][l_x] / AFF[l_x][l_x];
+      if (definitelyGreaterThan(aff, 1.0)) {
+        GRBLinExpr expr = var_x;
+        bool any = false;
+
+        // cout << l_x << " " << k << " " << aff << " " << B[l_x][cToBIdx(c_x)]
+        //      << " " << AFF[k][l_x] << " " << AFF[l_x][l_x] << endl;
+
+        for (const auto &[key_y, var_y] : z) {
+          const auto &[l_y, c_y, t_y] = key_y;
+
+          int bw_idx_2 = cToBIdx(c_y);
+          if (l_x == l_y || l_y != k || !overlap[c_x][c_y] || t_x != t_y ||
+              bw_idx != bw_idx_2)
+            continue;
+
+          any = true;
+          expr += var_y;
+        }
+
+        if (any) model->addConstr(expr <= 1);
+      }
+    }
+  }
+}
+
 // ---------------------------------------------
 
-int main(int argc, char **argv) {
-  freopen(argv[3], "r", stdin);
-  read_data();
-
-  cout << N << endl;
+double run(char **argv, bool pair) {
   auto start = high_resolution_clock::now();
   GRBEnv env;
   GRBModel *model = new GRBModel(env);
   GRBVar *I, *t;
   mt3 x, Iij, z;
   // variables
-  printf("variables...\n");
+  // printf("variables...\n");
   var_x(model, x);
   var_z(model, z);
   var_Iij(model, Iij);
@@ -235,7 +265,7 @@ int main(int argc, char **argv) {
 
   // constraints
   model->update();
-  printf("constraints...\n");
+  // printf("constraints...\n");
   symmetry1(model, t);
   symmetry2(model, x);
   unique(model, x);
@@ -245,18 +275,19 @@ int main(int argc, char **argv) {
   bigG(model, I, Iij, x);
   bigL(model, I, Iij, x);
   sinr(model, I, x);
+  if (pair) pairwise(model, x, z);
+
   auto stop = high_resolution_clock::now();
   duration<double> ms_double = stop - start;
   cout << ms_double.count() << endl;
   // optimize
   model->update();
-  // model->write("seila.lp");
-  // model->set(GRB_IntParam_LogToConsole, 0);
-  model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
+
+  model->set(GRB_IntParam_LogToConsole, 0);
+  model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
   model->optimize();
 
   if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
-    // model->write("sol.sol");
     string res = "result" + string(argv[1]);
     FILE *result = fopen(res.c_str(), "a");
     double objVal = model->get(GRB_DoubleAttr_ObjVal);
@@ -265,6 +296,10 @@ int main(int argc, char **argv) {
     if (approximatelyEqual(objVal, GRB_INFINITY * 1.0)) objVal = -1.0;
 
     if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
+
+    string file_sol =
+        "gurobi_sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
+    model->write(file_sol);
 
     fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
             objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
@@ -285,11 +320,20 @@ int main(int argc, char **argv) {
     }
 
     fclose(sol);
+    return objVal;
   } else {
     model->set(GRB_IntParam_IISMethod, 1);
     model->computeIIS();
     model->write("xi.ilp");
     cout << "not optimal!" << endl;
+    return -1;
   }
+}
+
+int main(int argc, char **argv) {
+  freopen(argv[3], "r", stdin);
+  read_data();
+
+  double obj = run(argv, true);
   return 0;
 }

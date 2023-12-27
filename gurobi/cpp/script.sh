@@ -1,13 +1,13 @@
 #!/bin/sh
 
-for j in 8 16 32 64 128 256 512 1024 2048;
+for j in 64; 
 do
-    for i in {1..30};
+    for i in {2..2};
     do
-        ./out ${j} ${i} ../../instances/U_${j}/MD-VRBSP_U_${j}_${i}.txt >> obj
+        ./bin/out ${j} ${i} ../../instances/U_${j}/MD-VRBSP_U_${j}_${i}.txt obj_pairwise
     done;
 
-    mkdir -p U_${j};
-    mv sol${j}* U_${j};
-    mv obj U_${j};
+    # mkdir -p U_${j};
+    # mv sol${j}* U_${j};
+    # mv obj U_${j};
 done;
