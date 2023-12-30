@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <tuple>
 
 #include "gurobi_c++.h"
@@ -247,6 +248,21 @@ inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
   }
 }
 
+void fix_variables(GRBModel *model, mt3 &x, string file_name) {
+  char name[100];
+  double value = 0;
+  FILE *file = fopen(file_name.c_str(), "r");
+  fgets(name, 100, file);
+  while (fscanf(file, "%s %lf\n", name, &value) != EOF) {
+    if (name[0] != 'x') continue;
+    GRBVar x = model->getVarByName(string(name));
+    model->addConstr(x >= value);
+    // printf("li %s %lf\n", name, value);
+  }
+
+  fclose(file);
+}
+
 // ---------------------------------------------
 
 double run(char **argv, bool pair) {
@@ -275,7 +291,7 @@ double run(char **argv, bool pair) {
   bigG(model, I, Iij, x);
   bigL(model, I, Iij, x);
   sinr(model, I, x);
-  if (pair) pairwise(model, x, z);
+  // if (pair) pairwise(model, x, z);
 
   auto stop = high_resolution_clock::now();
   duration<double> ms_double = stop - start;
@@ -283,7 +299,10 @@ double run(char **argv, bool pair) {
   // optimize
   model->update();
 
-  model->set(GRB_IntParam_LogToConsole, 0);
+  // model->read(string(argv[4]));
+  fix_variables(model, x, string(argv[4]));
+
+  // model->set(GRB_IntParam_LogToConsole, 0);
   model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
   model->optimize();
 
@@ -297,9 +316,7 @@ double run(char **argv, bool pair) {
 
     if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
 
-    string file_sol =
-        "gurobi_sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
-    model->write(file_sol);
+    // model->write(file_sol);
 
     fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
             objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
