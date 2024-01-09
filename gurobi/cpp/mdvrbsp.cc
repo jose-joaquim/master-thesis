@@ -230,7 +230,7 @@ inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
         // cout << l_x << " " << k << " " << aff << " " << B[l_x][cToBIdx(c_x)]
         //      << " " << AFF[k][l_x] << " " << AFF[l_x][l_x] << endl;
 
-        for (const auto &[key_y, var_y] : z) {
+        for (const auto &[key_y, var_y] : x) {
           const auto &[l_y, c_y, t_y] = key_y;
 
           int bw_idx_2 = cToBIdx(c_y);
@@ -291,7 +291,7 @@ double run(char **argv, bool pair) {
   bigG(model, I, Iij, x);
   bigL(model, I, Iij, x);
   sinr(model, I, x);
-  // if (pair) pairwise(model, x, z);
+  if (pair) pairwise(model, x, z);
 
   auto stop = high_resolution_clock::now();
   duration<double> ms_double = stop - start;
@@ -300,7 +300,7 @@ double run(char **argv, bool pair) {
   model->update();
 
   // model->read(string(argv[4]));
-  fix_variables(model, x, string(argv[4]));
+  // fix_variables(model, x, string(argv[4]));
 
   // model->set(GRB_IntParam_LogToConsole, 0);
   model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
@@ -309,14 +309,17 @@ double run(char **argv, bool pair) {
   if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
     string res = "result" + string(argv[1]);
     FILE *result = fopen(res.c_str(), "a");
-    double objVal = model->get(GRB_DoubleAttr_ObjVal);
+    double objVal = -1;
+    if (model->get(GRB_IntAttr_Status) != GRB_TIME_LIMIT)
+      objVal = model->get(GRB_DoubleAttr_ObjVal);
+
     double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
 
     if (approximatelyEqual(objVal, GRB_INFINITY * 1.0)) objVal = -1.0;
 
     if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
 
-    // model->write(file_sol);
+    model->write(argv[4]);
 
     fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
             objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
