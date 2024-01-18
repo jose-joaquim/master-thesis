@@ -103,6 +103,7 @@ inline void symmetry2(GRBModel *model, mt3 &x) {
 }
 
 inline void unique(GRBModel *model, mt3 &x) {
+  cout << "unique" << endl;
   for (int i = 0; i < N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
@@ -117,6 +118,7 @@ inline void unique(GRBModel *model, mt3 &x) {
 }
 
 inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
+  cout << "waste" << endl;
   for (int i = 0; i < N; ++i) {
     for (int _t = 0; _t < T; ++_t) {
       GRBLinExpr expr = 0;
@@ -130,6 +132,7 @@ inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
 }
 
 inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
+  cout << "overlap" << endl;
   for (int i = 0; i < N; ++i) {
     for (int c1 = 0; c1 < C; ++c1) {
       if (!canTransmitUsing(i, c1)) continue;
@@ -149,6 +152,7 @@ inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
 }
 
 inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
+  cout << "interch" << endl;
   for (int i = 0; i < N; ++i) {
     for (int t = 0; t < T; ++t) {
       for (int c = 0; c < C; ++c) {
@@ -169,6 +173,7 @@ inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
 }
 
 inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
+  cout << "bigG" << endl;
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsing(i, c)) continue;
@@ -184,6 +189,7 @@ inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
 }
 
 inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
+  cout << "bigL" << endl;
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsing(i, c)) continue;
@@ -199,6 +205,7 @@ inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
 }
 
 inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
+  cout << "sinr" << endl;
   for (int i = 0; i < N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
@@ -215,37 +222,72 @@ inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
 }
 
 inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
+  cout << "pairwise" << endl;
+  using ptv = pair<tuple<int, int, int>, GRBVar>;
+  vector<vector<ptv>> var_l(N, vector<ptv>());
+
   for (const auto &[key_x, var_x] : x) {
     const auto &[l_x, c_x, t_x] = key_x;
+    var_l[l_x].push_back(make_pair(key_x, var_x));
+  }
 
-    for (int k = 0; k < N; ++k) {
-      if (l_x == k) continue;
+  for (int i = 0; i < N; ++i) {
+    for (const auto &[key_i, var_i] : var_l[i]) {
+      const auto &[_, c_i, t_i] = key_i;
+      for (int j = 0; j < N; ++j) {
+        if (i == j) continue;
 
-      int bw_idx = cToBIdx(c_x);
-      double aff = B[l_x][bw_idx] * AFF[k][l_x] / AFF[l_x][l_x];
-      if (definitelyGreaterThan(aff, 1.0)) {
-        GRBLinExpr expr = var_x;
-        bool any = false;
+        int bw_idx = cToBIdx(c_i);
+        double aff = B[i][bw_idx] * AFF[j][i] / AFF[i][i];
+        if (definitelyGreaterThan(aff, 1.0)) {
+          GRBLinExpr expr = var_i;
+          bool any = false;
 
-        // cout << l_x << " " << k << " " << aff << " " << B[l_x][cToBIdx(c_x)]
-        //      << " " << AFF[k][l_x] << " " << AFF[l_x][l_x] << endl;
+          for (const auto &[key_j, var_j] : var_l[j]) {
+            const auto &[l_j, c_j, t_j] = key_j;
 
-        for (const auto &[key_y, var_y] : x) {
-          const auto &[l_y, c_y, t_y] = key_y;
+            int bw_idx_2 = cToBIdx(c_j);
+            if (!overlap[c_i][c_j] || t_i != t_j || bw_idx != bw_idx_2)
+              continue;
 
-          int bw_idx_2 = cToBIdx(c_y);
-          if (l_x == l_y || l_y != k || !overlap[c_x][c_y] || t_x != t_y ||
-              bw_idx != bw_idx_2)
-            continue;
+            any = true;
+            expr += var_j;
+          }
 
-          any = true;
-          expr += var_y;
+          if (any) model->addConstr(expr <= 1);
         }
-
-        if (any) model->addConstr(expr <= 1);
       }
     }
   }
+
+  // for (const auto &[key_x, var_x] : x) {
+  //   const auto &[l_x, c_x, t_x] = key_x;
+  //
+  //   for (int k = 0; k < N; ++k) {
+  //     if (l_x == k) continue;
+  //
+  //     int bw_idx = cToBIdx(c_x);
+  //     double aff = B[l_x][bw_idx] * AFF[k][l_x] / AFF[l_x][l_x];
+  //     if (definitelyGreaterThan(aff, 1.0)) {
+  //       GRBLinExpr expr = var_x;
+  //       bool any = false;
+  //
+  //       for (const auto &[key_y, var_y] : x) {
+  //         const auto &[l_y, c_y, t_y] = key_y;
+  //
+  //         int bw_idx_2 = cToBIdx(c_y);
+  //         if (t_y > l_x || l_x == l_y || l_y != k || !overlap[c_x][c_y] ||
+  //             t_x != t_y || bw_idx != bw_idx_2)
+  //           continue;
+  //
+  //         any = true;
+  //         expr += var_y;
+  //       }
+  //
+  //       if (any) model->addConstr(expr <= 1);
+  //     }
+  //   }
+  // }
 }
 
 void fix_variables(GRBModel *model, mt3 &x, string file_name) {
@@ -272,16 +314,20 @@ double run(char **argv, bool pair) {
   GRBVar *I, *t;
   mt3 x, Iij, z;
   // variables
-  // printf("variables...\n");
+  printf("variables...\n");
   var_x(model, x);
   var_z(model, z);
   var_Iij(model, Iij);
   var_I(model, I);
   var_t(model, t);
 
+  auto stop = high_resolution_clock::now();
+  duration<double> ms_double = stop - start;
+  cout << ms_double.count() << endl;
+
   // constraints
   model->update();
-  // printf("constraints...\n");
+  printf("constraints...\n");
   symmetry1(model, t);
   symmetry2(model, x);
   unique(model, x);
@@ -293,16 +339,13 @@ double run(char **argv, bool pair) {
   sinr(model, I, x);
   if (pair) pairwise(model, x, z);
 
-  auto stop = high_resolution_clock::now();
-  duration<double> ms_double = stop - start;
+  stop = high_resolution_clock::now();
+  ms_double = stop - start;
   cout << ms_double.count() << endl;
   // optimize
   model->update();
 
-  // model->read(string(argv[4]));
-  // fix_variables(model, x, string(argv[4]));
-
-  // model->set(GRB_IntParam_LogToConsole, 0);
+  model->set(GRB_IntParam_LogToConsole, 0);
   model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
   model->optimize();
 
