@@ -305,6 +305,70 @@ void fix_variables(GRBModel *model, mt3 &x, string file_name) {
   fclose(file);
 }
 
+class LogCallback : public GRBCallback {
+ public:
+  string path;
+  vector<string> lines;
+  double last_call = 0;
+
+  LogCallback(string path) : path(path) {}
+  ~LogCallback() {
+    ofstream file{path};
+
+    if (!file.is_open()) {
+      cout << "nao consegui abrir o arquivo callback" << endl;
+      exit(10);
+    }
+
+    for (string line : lines) file << line;
+    file.close();
+  }
+
+ protected:
+  void callback() {
+    try {
+      if (where == GRB_CB_MIP) {
+        double runtime = getDoubleInfo(GRB_CB_RUNTIME);
+
+        if (approximatelyEqual(last_call, 0.0) ||
+            definitelyGreaterThan(runtime - last_call, 5)) {
+          last_call = runtime;
+          double objbst = getDoubleInfo(GRB_CB_MIP_OBJBST);
+          if (objbst == GRB_INFINITY) objbst = 0.0;
+          double objbnd = getDoubleInfo(GRB_CB_MIP_OBJBND);
+          if (objbnd == GRB_INFINITY) objbst = 0.0;
+
+          double nodecnt = getDoubleInfo(GRB_CB_MIP_NODCNT);
+          int solcnt = getIntInfo(GRB_CB_MIP_SOLCNT);
+
+          char line[100];
+          snprintf(line, 100, "%.3lf %.3lf %.3lf %.3lf %d\n", runtime, nodecnt,
+                   objbst, objbnd, solcnt);
+          lines.push_back(string(line));
+        }
+      } /* else if (where == GRB_CB_MIPNODE) {
+        int status = getIntInfo(GRB_CB_MIPNODE_STATUS);
+
+        if (status == GRB_OPTIMAL) {
+          double runtime = getDoubleInfo(GRB_CB_RUNTIME);
+          double objbst = getDoubleInfo(GRB_CB_MIPNODE_OBJBST);
+          int solcnt = getIntInfo(GRB_CB_MIPNODE_SOLCNT);
+
+          char line[100];
+          snprintf(line, 100, "%.3lf %.3lf %.3lf %d\n", runtime, objbst, objbst,
+                   solcnt);
+          lines.push_back(string(line));
+          }
+          }*/
+    } catch (GRBException e) {
+      cout << "Error number: " << e.getErrorCode() << endl;
+      cout << e.getMessage() << endl;
+    } catch (...) {
+      cout << "Error during callback" << endl;
+    }
+  }
+};
+
 // ---------------------------------------------
 
 double run(char **argv, bool pair) {
@@ -347,6 +411,12 @@ double run(char **argv, bool pair) {
 
   model->set(GRB_IntParam_LogToConsole, 0);
   model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
+
+  string log_cb =
+      "./callback_log" + string(argv[1]) + "_" + string(argv[2]) + ".txt";
+  LogCallback cb = LogCallback(log_cb);
+
+  model->setCallback(&cb);
   model->optimize();
 
   if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
