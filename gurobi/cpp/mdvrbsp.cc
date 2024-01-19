@@ -423,13 +423,10 @@ double run(char **argv, bool pair) {
     string res = "result" + string(argv[1]);
     FILE *result = fopen(res.c_str(), "a");
     double objVal = -1;
-    if (model->get(GRB_IntAttr_Status) != GRB_TIME_LIMIT)
+    if (model->get(GRB_IntAttr_SolCount) > 0)
       objVal = model->get(GRB_DoubleAttr_ObjVal);
 
     double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
-
-    if (approximatelyEqual(objVal, GRB_INFINITY * 1.0)) objVal = -1.0;
-
     if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
 
     model->write(argv[4]);
