@@ -410,6 +410,7 @@ double run(char **argv, bool pair) {
   model->update();
 
   model->set(GRB_IntParam_LogToConsole, 0);
+  model->set(GRB_DoubleParam_TimeLimit, 3600);
   model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
 
   string log_cb =
