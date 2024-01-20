@@ -372,91 +372,100 @@ class LogCallback : public GRBCallback {
 // ---------------------------------------------
 
 double run(char **argv, bool pair) {
-  auto start = high_resolution_clock::now();
-  GRBEnv env;
-  GRBModel *model = new GRBModel(env);
-  GRBVar *I, *t;
-  mt3 x, Iij, z;
-  // variables
-  printf("variables...\n");
-  var_x(model, x);
-  var_z(model, z);
-  var_Iij(model, Iij);
-  var_I(model, I);
-  var_t(model, t);
+  try {
+    auto start = high_resolution_clock::now();
+    GRBEnv env;
+    GRBModel *model = new GRBModel(env);
+    GRBVar *I, *t;
+    mt3 x, Iij, z;
+    // variables
+    printf("variables...\n");
+    var_x(model, x);
+    var_z(model, z);
+    var_Iij(model, Iij);
+    var_I(model, I);
+    var_t(model, t);
 
-  auto stop = high_resolution_clock::now();
-  duration<double> ms_double = stop - start;
-  cout << ms_double.count() << endl;
+    auto stop = high_resolution_clock::now();
+    duration<double> ms_double = stop - start;
+    cout << ms_double.count() << endl;
 
-  // constraints
-  model->update();
-  printf("constraints...\n");
-  symmetry1(model, t);
-  symmetry2(model, x);
-  unique(model, x);
-  waste(model, x, t);
-  ch_overlap(model, z, x);
-  interch(model, z, Iij);
-  bigG(model, I, Iij, x);
-  bigL(model, I, Iij, x);
-  sinr(model, I, x);
-  if (pair) pairwise(model, x, z);
+    // constraints
+    model->update();
+    printf("constraints...\n");
+    symmetry1(model, t);
+    symmetry2(model, x);
+    unique(model, x);
+    waste(model, x, t);
+    ch_overlap(model, z, x);
+    interch(model, z, Iij);
+    bigG(model, I, Iij, x);
+    bigL(model, I, Iij, x);
+    sinr(model, I, x);
+    if (pair) pairwise(model, x, z);
 
-  stop = high_resolution_clock::now();
-  ms_double = stop - start;
-  cout << ms_double.count() << endl;
-  // optimize
-  model->update();
+    stop = high_resolution_clock::now();
+    ms_double = stop - start;
+    cout << ms_double.count() << endl;
+    // optimize
+    model->update();
 
-  model->set(GRB_IntParam_LogToConsole, 0);
-  model->set(GRB_DoubleParam_TimeLimit, 3600);
-  model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
+    // model->set(GRB_IntParam_LogToConsole, 0);
+    model->set(GRB_DoubleParam_TimeLimit, 3600);
+    model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
 
-  string log_cb =
-      "./callback_log" + string(argv[1]) + "_" + string(argv[2]) + ".txt";
-  LogCallback cb = LogCallback(log_cb);
+    string log_cb =
+        "./callback_log" + string(argv[1]) + "_" + string(argv[2]) + ".txt";
+    LogCallback cb = LogCallback(log_cb);
 
-  model->setCallback(&cb);
-  model->optimize();
+    model->setCallback(&cb);
+    model->optimize();
 
-  if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
-    string res = "result" + string(argv[1]);
-    FILE *result = fopen(res.c_str(), "a");
-    double objVal = -1;
-    if (model->get(GRB_IntAttr_SolCount) > 0)
-      objVal = model->get(GRB_DoubleAttr_ObjVal);
+    if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
+      string res = "result" + string(argv[1]);
+      FILE *result = fopen(res.c_str(), "a");
+      double objVal = -1;
 
-    double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
-    if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
+      if (model->get(GRB_IntAttr_SolCount) > 0) {
+        objVal = model->get(GRB_DoubleAttr_ObjVal);
+        model->write(argv[4]);
+        string res_sol =
+            "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
+        FILE *sol = fopen(res_sol.c_str(), "w");
 
-    model->write(argv[4]);
+        for (auto &var : x) {
+          const auto &[i, c, t] = var.first;
+          if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
+            fprintf(sol, "%d %d %d %lf\n", i, c, t,
+                    var.second.get(GRB_DoubleAttr_X));
+        }
 
-    fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
-            objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
-            model->get(GRB_IntAttr_NumVars), model->get(GRB_IntAttr_NumConstrs),
-            model->get(GRB_DoubleAttr_DNumNZs),
-            model->get(GRB_DoubleAttr_NodeCount),
-            model->get(GRB_DoubleAttr_Runtime));
-    fclose(result);
+        fclose(sol);
+      }
 
-    string res_sol = "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
-    FILE *sol = fopen(res_sol.c_str(), "w");
+      double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
+      if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
 
-    for (auto &var : x) {
-      const auto &[i, c, t] = var.first;
-      if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
-        fprintf(sol, "%d %d %d %lf\n", i, c, t,
-                var.second.get(GRB_DoubleAttr_X));
+      fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
+              objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
+              model->get(GRB_IntAttr_NumVars),
+              model->get(GRB_IntAttr_NumConstrs),
+              model->get(GRB_DoubleAttr_DNumNZs),
+              model->get(GRB_DoubleAttr_NodeCount),
+              model->get(GRB_DoubleAttr_Runtime));
+      fclose(result);
+
+      return objVal;
+    } else {
+      model->set(GRB_IntParam_IISMethod, 1);
+      model->computeIIS();
+      model->write("xi.ilp");
+      cout << "not optimal!" << endl;
+      return -1;
     }
-
-    fclose(sol);
-    return objVal;
-  } else {
-    model->set(GRB_IntParam_IISMethod, 1);
-    model->computeIIS();
-    model->write("xi.ilp");
-    cout << "not optimal!" << endl;
+  } catch (GRBException e) {
+    cout << "exception " << e.getErrorCode() << endl;
+    cout << e.getMessage() << endl;
     return -1;
   }
 }
