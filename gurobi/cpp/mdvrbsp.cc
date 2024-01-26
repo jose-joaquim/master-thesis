@@ -259,35 +259,6 @@ inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
       }
     }
   }
-
-  // for (const auto &[key_x, var_x] : x) {
-  //   const auto &[l_x, c_x, t_x] = key_x;
-  //
-  //   for (int k = 0; k < N; ++k) {
-  //     if (l_x == k) continue;
-  //
-  //     int bw_idx = cToBIdx(c_x);
-  //     double aff = B[l_x][bw_idx] * AFF[k][l_x] / AFF[l_x][l_x];
-  //     if (definitelyGreaterThan(aff, 1.0)) {
-  //       GRBLinExpr expr = var_x;
-  //       bool any = false;
-  //
-  //       for (const auto &[key_y, var_y] : x) {
-  //         const auto &[l_y, c_y, t_y] = key_y;
-  //
-  //         int bw_idx_2 = cToBIdx(c_y);
-  //         if (t_y > l_x || l_x == l_y || l_y != k || !overlap[c_x][c_y] ||
-  //             t_x != t_y || bw_idx != bw_idx_2)
-  //           continue;
-  //
-  //         any = true;
-  //         expr += var_y;
-  //       }
-  //
-  //       if (any) model->addConstr(expr <= 1);
-  //     }
-  //   }
-  // }
 }
 
 void fix_variables(GRBModel *model, mt3 &x, string file_name) {
@@ -346,20 +317,7 @@ class LogCallback : public GRBCallback {
                    objbst, objbnd, solcnt);
           lines.push_back(string(line));
         }
-      } /* else if (where == GRB_CB_MIPNODE) {
-        int status = getIntInfo(GRB_CB_MIPNODE_STATUS);
-
-        if (status == GRB_OPTIMAL) {
-          double runtime = getDoubleInfo(GRB_CB_RUNTIME);
-          double objbst = getDoubleInfo(GRB_CB_MIPNODE_OBJBST);
-          int solcnt = getIntInfo(GRB_CB_MIPNODE_SOLCNT);
-
-          char line[100];
-          snprintf(line, 100, "%.3lf %.3lf %.3lf %d\n", runtime, objbst, objbst,
-                   solcnt);
-          lines.push_back(string(line));
-          }
-          }*/
+      }
     } catch (GRBException e) {
       cout << "Error number: " << e.getErrorCode() << endl;
       cout << e.getMessage() << endl;
@@ -371,7 +329,7 @@ class LogCallback : public GRBCallback {
 
 // ---------------------------------------------
 
-double run(char **argv, bool pair) {
+double run(char **argv, bool pair, const Solution &sol, bool fix) {
   try {
     auto start = high_resolution_clock::now();
     GRBEnv env;
@@ -393,8 +351,8 @@ double run(char **argv, bool pair) {
     // constraints
     model->update();
     printf("constraints...\n");
-    symmetry1(model, t);
-    symmetry2(model, x);
+    // symmetry1(model, t);
+    // symmetry2(model, x);
     unique(model, x);
     waste(model, x, t);
     ch_overlap(model, z, x);
@@ -410,6 +368,13 @@ double run(char **argv, bool pair) {
     // optimize
     model->update();
 
+    for (const auto &idx : gurobi_sol(sol)) {
+      if (fix)
+        model->addConstr(x[idx] >= 1.0);
+      else
+        x[idx].set(GRB_DoubleAttr_Start, 1.0);
+    }
+
     // model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_TimeLimit, 3600);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
@@ -423,7 +388,6 @@ double run(char **argv, bool pair) {
 
     if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
       string res = "result" + string(argv[1]);
-      FILE *result = fopen(res.c_str(), "a");
       double objVal = -1;
 
       if (model->get(GRB_IntAttr_SolCount) > 0) {
@@ -446,6 +410,7 @@ double run(char **argv, bool pair) {
       double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
       if (approximatelyEqual(dualObj, GRB_INFINITY * 1.0)) dualObj = -1.0;
 
+      FILE *result = fopen(res.c_str(), "a");
       fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
               objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
               model->get(GRB_IntAttr_NumVars),
@@ -471,9 +436,14 @@ double run(char **argv, bool pair) {
 }
 
 int main(int argc, char **argv) {
+  cout << argv[1] << " " << argv[2] << " " << argv[3] << " " << argv[4] << endl;
   freopen(argv[3], "r", stdin);
   read_data();
 
-  double obj = run(argv, true);
+  const Solution sol = CH();
+  T = sol.slots.size();
+  cout << T << endl;
+
+  double obj = run(argv, true, sol, false);
   return 0;
 }

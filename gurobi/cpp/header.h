@@ -140,17 +140,6 @@ int overlap[45][45] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
      0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1}};
 
-int bwIdx(int bw) {
-  if (bw == 40) {
-    return 1;
-  } else if (bw == 80) {
-    return 2;
-  } else if (bw == 160) {
-    return 3;
-  }
-  return 0;
-}
-
 inline double distance(double X_si, double Y_si, double X_ri, double Y_ri) {
   return hypot((X_si - X_ri), (Y_si - Y_ri));
 }
@@ -230,17 +219,6 @@ double gammaToBeta(double gmm, int bw) {
   return SINR[11][3] + 1.0;
 }
 
-int numberToBw(int c) {
-  if (c <= 24)
-    return 20;
-  else if (c <= 36)
-    return 40;
-  else if (c <= 42)
-    return 80;
-  else
-    return 160;
-}
-
 int cToBIdx(int c) {
   if (c <= 24)
     return 0;
@@ -309,28 +287,11 @@ struct Connection {
   double distanceSR;
   double violation;
 
-  Connection(int id, double throughput, double interference, double distanceSR)
-      : id(id),
-        throughput(throughput),
-        interference(interference),
-        distanceSR(distanceSR) {
-    violation = 0.0;
-    SINR = 0.0;
-  }
+  Connection(int id, double throughput, double interference, double distanceSR);
+  Connection(int id);
 
-  Connection(int id) : id(id) {
-    throughput = 0.0;
-    interference = 0.0;
-    SINR = 0.0;
-    violation = 0.0;
-    distanceSR = DM[id][id];
-  }
-
-  bool operator<(const Connection &other) const {
-    return distanceSR < other.distanceSR;
-  }
-
-  bool operator>(const Connection &other) const { return !operator<(other); }
+  bool operator<(const Connection &other) const;
+  bool operator>(const Connection &other) const;
 };
 
 struct Channel {
@@ -340,58 +301,26 @@ struct Channel {
   int bandwidth;
   vector<Connection> connections;
 
-  bool operator<(const Channel &other) const {
-    return bandwidth < other.bandwidth;
-  }
-
-  bool operator>(const Channel &other) const { return !operator<(other); }
-
   Channel(double throughput, double interference, double violation,
-          int bandwidth, const vector<Connection> connections)
-      : throughput(throughput),
-        interference(interference),
-        violation(violation),
-        bandwidth(bandwidth),
-        connections(connections) {}
+          int bandwidth, const vector<Connection> connections);
+  Channel(int bandwidth);
+  Channel();
 
-  Channel(int bandwidth)
-      : Channel(0.0, 0.0, 0.0, bandwidth, vector<Connection>()) {}
-
-  Channel() : Channel(0.0) {}
-};
-
-struct Spectrum {
-  int maxFrequency;
-  int usedFrequency;
-  double interference;
-  vector<Channel> channels;
-
-  Spectrum(int maxFrequency, int usedFrequency, const vector<Channel> channels)
-      : maxFrequency(maxFrequency),
-        usedFrequency(usedFrequency),
-        channels(channels) {
-    interference = 0.0;
-  }
-
-  Spectrum() {
-    maxFrequency = 0;
-    usedFrequency = 0;
-    interference = 0.0;
-    channels = vector<Channel>();
-  }
+  Connection &operator()(int l);
+  bool operator<(const Channel &other) const;
+  bool operator>(const Channel &other) const;
 };
 
 struct TimeSlot {
-  vector<Spectrum> spectrums;
+  vector<Channel> channels;
   double interference;
   double throughput;
 
-  TimeSlot(const vector<Spectrum> sp) : TimeSlot() { spectrums = sp; }
-  TimeSlot() {
-    interference = 0.0;
-    throughput = 0.0;
-    spectrums = vector<Spectrum>();
-  }
+  TimeSlot(const vector<Channel> &);
+  TimeSlot();
+
+  Channel &operator()(int c);
+  Connection &operator()(int c, int l);
 };
 
 class Solution {
@@ -400,370 +329,379 @@ class Solution {
   double throughput;
   double violation;
 
-  Solution(const vector<Spectrum> sp, double tot, bool flag) : throughput(tot) {
-    slots.emplace_back(sp);
-    violation = 0.0;
-  }
+  Solution(const vector<Channel> sp, double tot, bool flag);
+  Solution(const vector<TimeSlot> &ts);
+  Solution();
 
-  Solution(const vector<TimeSlot> &ts) : slots(ts) {
-    throughput = 0.0;
-    violation = 0.0;
-  }
+#ifdef MDVRBSP
+  bool operator<(const Solution &o1) const;
+  bool operator>(const Solution &o1) const;
+#else
+  bool operator<(const Solution &o1) const;
+  bool operator>(const Solution &o1) const;
+#endif
 
-  Solution() {
-    slots = vector<TimeSlot>();
-    throughput = 0.0;
-    violation = 0.0;
-  }
-
-  bool operator<(const Solution &o1) const { return violation < o1.violation; }
-
-  bool operator>(const Solution &o1) const { return !operator<(o1); }
-
-  Channel &operator()(int t, int s, int c) {
-    return slots[t].spectrums[s].channels[c];
-  }
+  TimeSlot &operator()(int t);
+  Channel &operator()(int t, int c);
+  Connection &operator()(int t, int c, int l);
 };
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-static vector<Spectrum> init_conf;
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-void initTimeSlot() {
-  for (Spectrum &sp : init_conf) {
-    while (sp.maxFrequency - sp.usedFrequency > 0) {
-      int bw = 160;
-      while (bw > (sp.maxFrequency - sp.usedFrequency) && bw > 20) {
-        bw /= 2;
-      }
-
-      if (bw <= (sp.maxFrequency - sp.usedFrequency)) {
-        sp.usedFrequency += bw;
-        sp.channels.emplace_back(0.0, 0.0, 0.0, bw, vector<Connection>());
-      }
-    }
-    assert(sp.maxFrequency - sp.usedFrequency >= 0);
-  }
-
-  // vector<Channel> aux;
-  // aux.emplace_back(Channel());
-  // init_conf.emplace_back(0, 0, aux);
+Connection::Connection(int id, double throughput, double interference,
+                       double distanceSR)
+    : id(id),
+      throughput(throughput),
+      interference(interference),
+      distanceSR(distanceSR) {
+  violation = 0.0;
+  SINR = 0.0;
 }
 
-double computeConnectionThroughput(Connection &conn, int bandwidth) {
-  if (bandwidth == 0) return 0.0;
+Connection::Connection(int id) : id(id) {
+  throughput = 0.0;
+  interference = 0.0;
+  SINR = 0.0;
+  violation = 0.0;
+  distanceSR = DM[id][id];
+}
 
-  int mcs = -1;
-  int maxDataRate = 11;
+bool Connection::operator<(const Connection &other) const {
+  return distanceSR < other.distanceSR;
+}
 
-  if (approximatelyEqual(conn.interference, 0.0, EPS)) {
-    mcs = maxDataRate;
-    conn.throughput = DR[mcs][bwIdx(bandwidth)];
+bool Connection::operator>(const Connection &other) const {
+  return !operator<(other);
+}
+
+bool Channel::operator<(const Channel &other) const {
+  return bandwidth < other.bandwidth;
+}
+
+bool Channel::operator>(const Channel &other) const {
+  return !operator<(other);
+}
+
+Channel::Channel(double throughput, double interference, double violation,
+                 int bandwidth, const vector<Connection> connections)
+    : throughput(throughput),
+      interference(interference),
+      violation(violation),
+      bandwidth(bandwidth),
+      connections(connections) {}
+
+Channel::Channel(int bandwidth)
+    : Channel(0.0, 0.0, 0.0, bandwidth, vector<Connection>()) {}
+
+Channel::Channel() : Channel(0.0) {}
+
+Connection &Channel::operator()(int l) { return connections[l]; }
+
+TimeSlot::TimeSlot(const vector<Channel> &sp) : TimeSlot() { channels = sp; }
+
+TimeSlot::TimeSlot() {
+  interference = 0.0;
+  throughput = 0.0;
+  channels = vector<Channel>();
+}
+
+Channel &TimeSlot::operator()(int c) { return channels[c]; }
+
+Connection &TimeSlot::operator()(int c, int l) {
+  return channels[c].connections[l];
+}
+
+Solution::Solution(const vector<Channel> sp, double tot, bool flag)
+    : throughput(tot) {
+  slots.emplace_back(sp);
+  violation = 0.0;
+}
+
+Solution::Solution(const vector<TimeSlot> &ts) : slots(ts) {
+  throughput = 0.0;
+  violation = 0.0;
+}
+
+Solution::Solution() {
+  slots = vector<TimeSlot>();
+  throughput = 0.0;
+  violation = 0.0;
+}
+
+#ifdef MDVRBSP
+bool Solution::operator<(const Solution &o1) const {
+  return violation < o1.violation;
+}
+
+bool Solution::operator>(const Solution &o1) const {
+  return !Solution::operator<(o1);
+}
+#else
+bool Solution::operator<(const Solution &o1) const {
+  return throughput < o1.throughput;
+}
+
+bool Solution::operator>(const Solution &o1) const {
+  return !Solution::operator<(o1);
+}
+#endif
+
+TimeSlot &Solution::operator()(int t) { return slots[t]; }
+
+Channel &Solution::operator()(int t, int c) { return slots[t].channels[c]; }
+
+Connection &Solution::operator()(int t, int c, int l) {
+  return slots[t].channels[c].connections[l];
+}
+
+double computeConnectionThroughput(Connection &i, int bw) {
+  if (bw == 0) return 0.0;
+
+  if (approximatelyEqual(i.interference, 0.0, EPS)) {
+    i.SINR = 1e7;
+    i.throughput = DR[11][bToIdx(bw)];
   } else {
-    conn.SINR = AFF[conn.id][conn.id] / (conn.interference + NOI);
+    i.SINR = AFF[i.id][i.id] / (i.interference + NOI);
 
-    mcs = 11;
-    while (mcs >= 0 && conn.SINR < SINR[mcs][bwIdx(bandwidth)]) mcs--;
+    int mcs = 11;
+    while (mcs >= 0 && i.SINR < SINR[mcs][bToIdx(bw)]) mcs--;
 
-    if (mcs < 0)
-      conn.throughput = 0.0;
-    else
-      conn.throughput = DR[mcs][bwIdx(bandwidth)];
+    if (mcs < 0) {
+      return -1;
+    } else
+      i.throughput = DR[mcs][bToIdx(bw)];
   }
 
-  return conn.throughput;
+  return i.throughput;
 }
 
-void computeChannelsThroughput(vector<Channel> &channels) {
-  for (Channel &channel : channels) {
-    double of = 0.0;
-    for (Connection &conn : channel.connections) {
-      of += computeConnectionThroughput(conn, channel.bandwidth);
+#ifdef MDVRBSP
+optional<Channel> insertInChannel(Channel new_c, int i_idx) {
+  Connection i(i_idx, 0.0, 0.0, DM[i_idx][i_idx]);
+
+  for (auto &j : new_c.connections) {
+    j.interference += AFF[i_idx][j.id];
+    i.interference += AFF[j.id][i_idx];
+  }
+
+  new_c.connections.emplace_back(i);
+  for (auto &connection : new_c.connections) {
+    double ans = computeConnectionThroughput(connection, new_c.bandwidth);
+    if (ans == -1) {
+      return nullopt;
     }
-    channel.throughput = of;
+    new_c.throughput += connection.throughput;
   }
+
+  return new_c;
 }
 
-double computeThroughput(Solution &curr, bool force = false) {
-  double OF = 0.0;
+optional<vector<Channel>> split(Channel toSplit, vector<double> *GMA) {
+  vector<Channel> ret(2, Channel(toSplit.bandwidth / 2));
 
-  for (int t = 0; t < curr.slots.size(); t++) {
-    for (int s = 0; s < curr.slots[t].spectrums.size(); s++) {
-      for (int c = 0; c < curr.slots[t].spectrums[s].channels.size(); c++) {
-        auto &chan = curr.slots[t].spectrums[s].channels[c];
-        chan.throughput = 0.0;
-        for (Connection &u : chan.connections) {
-          u.interference = 0.0;
-          u.throughput = 0.0;
-          for (Connection &v : chan.connections)
-            u.interference += u.id == v.id ? 0.0 : AFF[u.id][v.id];
+  vector<Connection> reinsert = toSplit.connections;
+  sort(reinsert.rbegin(), reinsert.rend());
 
-          chan.throughput += computeConnectionThroughput(u, chan.bandwidth);
-        }
-        OF += chan.throughput;
-      }
-    }
-  }
-
-  curr.throughput = OF;
-  return OF;
-}
-
-Channel insertLink(Channel newChannel, int idConn) {  // TODO: remover macro
-  Connection conn(idConn, 0.0, 0.0, DM[idConn][idConn]);
-
-  for (auto &connection : newChannel.connections) {
-    connection.interference += AFF[connection.id][idConn];
-    conn.interference += AFF[idConn][connection.id];
-  }
-
-  newChannel.connections.emplace_back(conn);
-  newChannel.throughput = 0.0;
-  newChannel.violation = 0.0;
-  for (auto &connection : newChannel.connections) {
-    computeConnectionThroughput(connection, newChannel.bandwidth);
-    newChannel.throughput += connection.throughput;
-  }
-
-  return newChannel;
-}
-
-vector<Channel> split(Channel toSplit) {
-  int newBw = toSplit.bandwidth / 2;
-  vector<Channel> ret;
-  ret.emplace_back(Channel(0.0, 0.0, 0.0, newBw, vector<Connection>()));
-  ret.emplace_back(Channel(0.0, 0.0, 0.0, newBw, vector<Connection>()));
-
-  vector<Connection> connToInsert = toSplit.connections;
-  sort(connToInsert.rbegin(), connToInsert.rend());
-
-  double bestThroughputsoFar = 0.0;
-  for (int i = 0; i < connToInsert.size(); i++) {
-    double bestThroughputIteration = 0.0, testando = 0.0;
-    Channel bestChannel(0.0, 0.0, 0.0, newBw, vector<Connection>());
-    int bestIdx = -1;
+  for (int i = 0; i < reinsert.size(); i++) {
+    optional<Channel> bestChannel;
+    int best_c = -1;
 
     for (int c = 0; c < ret.size(); c++) {
-      Channel inserted = insertLink(ret[c], connToInsert[i].id);
-      double resultThroughput = inserted.throughput;
+      optional<Channel> inserted = insertInChannel(ret[c], reinsert[i].id);
 
-      double g_throughput =
-          (bestThroughputsoFar - ret[c].throughput) + resultThroughput;
-      testando = max(testando, g_throughput);
-      bool one = g_throughput > bestThroughputIteration;
-      bool two = approximatelyEqual(g_throughput, bestThroughputIteration) &&
-                 (inserted.connections.size() < bestChannel.connections.size());
-
-      if (one || two) {
-        bestThroughputIteration = g_throughput;
+      if (inserted && inserted->throughput > bestChannel->throughput) {
         bestChannel = inserted;
-        bestIdx = c;
+        best_c = c;
       }
     }
 
-    assert(bestIdx >= 0);
-    ret[bestIdx] = bestChannel;
-    bestThroughputsoFar = bestThroughputIteration;
-  }
-  computeChannelsThroughput(ret);
+    if (!bestChannel) return nullopt;
 
-  assert(approximatelyEqual(ret[0].throughput + ret[1].throughput,
-                            bestThroughputsoFar));
+    assert(best_c >= 0);
+    ret[best_c] = *bestChannel;
+  }
+
+  if (GMA != nullptr)
+    for (const auto &ch : ret)
+      for (const auto &conn : ch.connections)
+        if (definitelyLessThan(conn.throughput, (*GMA)[conn.id]))
+          return nullopt;
+
   return ret;
 }
 
-bool is_feasible(const Solution &ret, bool retOption = true) {
-  for (const TimeSlot &ts : ret.slots) {
-    for (const Spectrum &sp : ts.spectrums) {
-      for (const Channel &ch : sp.channels) {
-        for (const Connection &conn : ch.connections) {
-          if (definitelyLessThan(conn.throughput, GMM[conn.id])) {
-            printf("ops... conn %d %lf %lf\n", conn.id, conn.throughput,
-                   GMM[conn.id]);
-            return false;
-          }
-        }
-      }
-    }
+optional<Channel> try_insert(int conn_id, optional<Channel> ch) {
+  ch = insertInChannel(*ch, conn_id);
+  if (!ch) return nullopt;
+
+  for (Connection &conn : ch->connections) {
+    if (definitelyLessThan(conn.throughput, GMM[conn.id])) return nullopt;
+    assert(definitelyGreaterThan(conn.SINR, 0.0));
   }
 
-  return true;
-}
-
-// int feas_recur(const Channel &c) {
-//     printf("recur bw %d |c| %d\n", c.bandwidth, (int)c.connections.size());
-//     int ret = c.bandwidth;
-//     if (!is_feasible(c)) {
-//         int bw1 = c.bandwidth, bw2 = c.bandwidth > 20 ? c.bandwidth / 2 :
-//         c.bandwidth; Channel c1(bw1), c2(bw2);
-//
-//         vector<int> links1, links2;
-//         for (int i = 0; i < c.connections.size(); ++i) {
-//             int a = necessaryBw(GMM[c(i)]);
-//             int b = idxToB(a);
-//             cout << a << " " << c(i) << " " << b << endl;
-//             if (b < c.bandwidth)
-//                 links2.emplace_back(c(i));
-//             else links1.emplace_back(c(i));
-//         }
-//
-//         printf("links1 eh %d links2 eh %d\n", (int)links1.size(),
-//         (int)links2.size()); for (int i = 0; i < links1.size(); ++i)
-//             c1 = insertLink(c1, links1[i]);
-//
-//         for (int i = 0; i < links2.size(); ++i)
-//             c2 = insertLink(c2, links2[i]);
-//
-//         ret = feas_recur(c1);
-//         ret += feas_recur(c2);
-//     }
-//
-//     printf("ret eh %d\n", ret);
-//     return ret;
-// }
-//
-// int aux() {
-//     int ans = 0;
-//     map<int, vector<int>> lPerBw;
-//
-//     int maxBw = -1;
-//     for (int i = 0; i < N; ++i)
-//         maxBw = max(maxBw, idxToB(necessaryBw(GMM[i])));
-//
-//     Channel c(maxBw);
-//     for (int i = 0; i < N; ++i) {
-//         c = insertLink(c, i);
-//         // int bw = idxToB(necessaryBw(GMM[i]));
-//         // lPerBw[bw].emplace_back(i);
-//     }
-//
-//     ans += feas_recur(c);
-//
-//     // for (auto &e : lPerBw) {
-//     //     printf("channel of %d: ", e.first);
-//     //     Channel c(e.first);
-//     //     for (int i = 0; i < e.second.size(); ++i) {
-//     //         c = insertLink(c, e.second[i]);
-//     //     }
-//     //
-//     //     ans += feas_recur(c);
-//     // }
-//
-//     return ceil(ans * 1.0 / 500.0);
-//
-// }
-
-bool try_insert(int conn_id, Channel &ch) {
-  ch = insertLink(ch, conn_id);
-
-  for (Connection &conn : ch.connections)
-    if (definitelyLessThan(conn.throughput, GMM[conn.id])) {
-      return false;
-    }
-
-  return true;
+  return ch;
 }
 
 bool can_split(const Channel &ch) {
   if (ch.bandwidth <= 20) return false;
 
   for (const auto &conn : ch.connections)
-    if (definitelyLessThan(DR[11][bToIdx(ch.bandwidth)], GMM[conn.id]))
+    if (definitelyLessThan(DR[11][bToIdx(ch.bandwidth / 2)], GMM[conn.id]))
       return false;
-
-  Channel aux(ch.bandwidth / 2);
-  for (auto &conn : ch.connections)
-    if (!try_insert(conn.id, aux)) return false;
 
   return true;
 }
 
-#ifdef MDVRBSP
-int CH() {
-  TimeSlot dummy_ts(init_conf);
+Solution CH() {
+  Channel ch160(160);
+  Channel ch80(80);
+  Channel ch20(20);
+  vector<Channel> chs{ch160, ch160, ch80, ch20};
+  TimeSlot dummy_ts(chs);
   Solution ret({dummy_ts});
 
-  vector<int> links;
-  for (int i = 0; i < N; ++i) links.emplace_back(i);
-
+  vector<int> links(N);
+  iota(links.begin(), links.end(), 0);
   shuffle(links.begin(), links.end(), whatever);
 
   for (int conn : links) {
-    bool success = false;
-    for (int t = 0; t < ret.slots.size(); t++) {
-      for (int s = 0; s < ret.slots[t].spectrums.size(); s++) {
-        if (success) break;
+    for (int t = 0; t < ret.slots.size(); t++)
+      for (int c = 0; c < ret(t).channels.size(); c++) {
+        auto rst = try_insert(conn, ret(t, c));
 
-        for (int c = 0; c < ret.slots[t].spectrums[s].channels.size(); c++) {
-          if (success) break;
+        if (rst) {
+          ret(t, c) = *rst;
+          for (int t = 0; const TimeSlot &ts : ret.slots) {
+            for (const Channel &ch : ts.channels) {
+              for (const Connection &conn : ch.connections) {
+                // cout << conn.id << " " << conn.SINR << " " <<
+                // conn.interference
+                //      << " " << B[conn.id][bToIdx(ch.bandwidth)] << endl;
 
-          Channel cp_channel = ret(t, s, c);
-          success = try_insert(conn, cp_channel);
-
-          if (success) {
-            ret(t, s, c) = cp_channel;
-            break;
+                assert(definitelyGreaterThan(conn.throughput, GMM[conn.id]));
+                assert(definitelyGreaterThan(
+                           conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]) ||
+                       approximatelyEqual(conn.SINR,
+                                          B[conn.id][bToIdx(ch.bandwidth)]));
+              }
+            }
           }
 
-          if (can_split(ret(t, s, c))) {
-            assert(approximatelyEqual(ret(t, s, c).violation, 0.0));
-            vector<Channel> ch_split = split(ret(t, s, c));
+          goto NEXT_CONN;
+        }
 
-            assert(approximatelyEqual(ch_split[0].violation, 0.0));
-            assert(approximatelyEqual(ch_split[1].violation, 0.0));
+        if (can_split(ret(t, c))) {
+          auto ch_split = split(ret(t, c), &GMM);
 
-            cp_channel = ch_split[0];
-            success = try_insert(conn, cp_channel);
+          if (!ch_split) continue;
 
-            if (success) {
-              swap(ret.slots[t].spectrums[s].channels[c],
-                   ret.slots[t].spectrums[s].channels.back());
-              ret.slots[t].spectrums[s].channels.pop_back();
-              ret.slots[t].spectrums[s].channels.emplace_back(cp_channel);
-              ret.slots[t].spectrums[s].channels.emplace_back(ch_split[1]);
-              break;
-            }
+          for (int i = 0; i < ch_split->size(); ++i) {
+            auto cp_channel = try_insert(conn, (*ch_split)[i]);
 
-            cp_channel = ch_split[1];
-            success = try_insert(conn, cp_channel);
+            if (cp_channel) {
+              swap(ret(t, c), ret(t).channels.back());
+              ret(t).channels.pop_back();
+              ret(t).channels.emplace_back(*cp_channel);
+              ret(t).channels.emplace_back((*ch_split)[i == 0]);
+              for (int t = 0; const TimeSlot &ts : ret.slots) {
+                for (const Channel &ch : ts.channels) {
+                  for (const Connection &conn : ch.connections) {
+                    // cout << conn.id << " " << conn.SINR << " "
+                    //      << conn.interference << " "
+                    //      << B[conn.id][bToIdx(ch.bandwidth)] << endl;
 
-            if (success) {
-              swap(ret.slots[t].spectrums[s].channels[c],
-                   ret.slots[t].spectrums[s].channels.back());
-              ret.slots[t].spectrums[s].channels.pop_back();
-              ret.slots[t].spectrums[s].channels.emplace_back(cp_channel);
-              ret.slots[t].spectrums[s].channels.emplace_back(ch_split[0]);
-              break;
+                    assert(
+                        definitelyGreaterThan(conn.throughput, GMM[conn.id]));
+                    assert(definitelyGreaterThan(
+                               conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]) ||
+                           approximatelyEqual(
+                               conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]));
+                  }
+                }
+
+                goto NEXT_CONN;
+              }
             }
           }
         }
       }
+
+    {
+      TimeSlot new_ts{dummy_ts};
+      int bw = new_ts(0).bandwidth;
+      assert(bw == 160);
+      Connection new_conn{conn};
+
+      new_conn.SINR = 1000000007;
+      new_conn.throughput = DR[11][bToIdx(bw)];
+      new_ts(0).connections.emplace_back(new_conn);
+      ret.slots.emplace_back(new_ts);
+      goto NEXT_CONN;
     }
 
-    if (!success) {
-      TimeSlot new_ts(dummy_ts);
-      for (int s = 0; s < new_ts.spectrums.size() && !success; s++) {
-        for (int c = 0; c < new_ts.spectrums[s].channels.size() && !success;
-             c++) {
-          int bw = new_ts.spectrums[s].channels[c].bandwidth;
-          if (bw >= 160) {
-            Connection new_conn(conn);
-            new_conn.SINR = 1000000007;
-            new_conn.throughput = DR[11][bwIdx(bw)];
-            new_ts.spectrums[s].channels[c].connections.push_back(new_conn);
-            ret.slots.emplace_back(new_ts);
-            success = true;
-            break;
-          }
-        }
-      }
-    }
-    computeThroughput(ret);
-    assert(is_feasible(ret));
+  NEXT_CONN:;
+
+    // computeThroughput(ret);
+    // assert(mdvrbsp_feasible(ret));
   }
 
-  computeThroughput(ret);
-  return (int)ret.slots.size();
+  for (int t = 0; const TimeSlot &ts : ret.slots) {
+    for (const Channel &ch : ts.channels) {
+      for (const Connection &conn : ch.connections) {
+        assert(definitelyGreaterThan(conn.throughput, GMM[conn.id]));
+        assert(definitelyGreaterThan(conn.SINR,
+                                     B[conn.id][bToIdx(ch.bandwidth)]) ||
+               approximatelyEqual(conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]));
+      }
+    }
+  }
+
+  return ret;
+}
+
+vector<tuple<int, int, int>> gurobi_sol(const Solution &sol) {
+  vector<vector<int>> C_b = {
+      {
+          0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+          13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+      },
+      {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
+      {37, 38, 39, 40, 41, 42},
+      {43, 44},
+  };
+
+  vector<tuple<int, int, int>> ans;
+  set<int> allow_tmp;
+  for (int i = 0; i < 45; ++i) allow_tmp.insert(i);
+
+  vector<set<int>> channels_free(sol.slots.size(), allow_tmp);
+
+  for (const TimeSlot &ts : sol.slots) {
+    for (const Channel &ch : ts.channels) {
+      if (ch.connections.empty()) continue;
+
+      bool none = true;
+      for (int i = 0; i < channels_free.size() && none; ++i) {
+        for (const int candidate : C_b[bToIdx(ch.bandwidth)]) {
+          if (channels_free[i].contains(candidate)) {
+            // printf("CHANNEL (%d, %d, %d):\n", candidate, i, ch.bandwidth);
+            for (const Connection &conn : ch.connections) {
+              // cout << "     " << conn.id << " " << conn.interference << endl;
+              ans.push_back({conn.id, candidate, i});
+            }
+            // printf("end\n");
+
+            for (int j = 0; j < 45; ++j)
+              if (overlap[candidate][j]) channels_free[i].erase(j);
+
+            none = false;
+          }
+
+          if (!none) break;
+        }
+      }
+    }
+  }
+
+  return ans;
 }
 #endif
 
@@ -773,8 +711,6 @@ void read_data() {
   for (int i = 0; i < n_spectrums; i++) {
     int s;
     scanf("%d", &s);
-    spectrum_size.emplace_back(s);
-    init_conf.emplace_back(s, 0, vector<Channel>());
   }
 
   if (NOI != 0) {
@@ -829,13 +765,6 @@ void read_data() {
     }
   }
 
-  initTimeSlot();
-#ifdef MDVRBSP
-  printf("%d %d\n", avgNts(), CH());
-  // T = avgNts();
-  T = CH();
-  cout << T << endl;
-#endif
   BM.assign(N, 0.0);
   B.assign(N, vector<double>(4, 0));
   for (int i = 0; i < N; i++) {
