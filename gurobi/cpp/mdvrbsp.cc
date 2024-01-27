@@ -440,9 +440,18 @@ int main(int argc, char **argv) {
   freopen(argv[3], "r", stdin);
   read_data();
 
+  auto start = high_resolution_clock::now();
   const Solution sol = CH();
   T = sol.slots.size();
-  cout << T << endl;
+
+  auto stop = high_resolution_clock::now();
+  duration<double> ms_double = stop - start;
+  cout << "ch " << ms_double.count() << endl;
+
+  // FILE *ch_obj = fopen("ch_obj", "a");
+  // fprintf(ch_obj, "%u\t%lf\n", T, ms_double.count());
+  // fclose(ch_obj);
+  // return 0;
 
   double obj = run(argv, true, sol, false);
   return 0;
