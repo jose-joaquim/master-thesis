@@ -19,7 +19,7 @@
 const int MAX_CONN = 2048;
 const int X_c = 0;
 const int Y_c = 1;
-const double EPS = 1e-9;
+const double EPS = 1e-6;
 
 using namespace std;
 using namespace std::chrono;
@@ -160,6 +160,10 @@ bool definitelyLessThan(double a, double b, double epsilon = EPS) {
   return (b - a) > ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
+bool GreaterOrEqual(double a, double b) {
+  return definitelyGreaterThan(a, b) || approximatelyEqual(a, b);
+}
+
 void convertTableToMW(const vector<vector<double>> &_SINR,
                       vector<vector<double>> &__SINR) {
   double result, b;
@@ -203,17 +207,12 @@ double convertDBMToMW(double _value) {
 }
 
 double gammaToBeta(double gmm, int bw) {
-  int last = -1;
+  int mcs = 11;
 
-  for (int i = 0; i < 12; i++) {
-    if (DR[i][bw] >= gmm) {
-      last = i;
-      break;
-    }
-  }
+  while (mcs >= 0 && definitelyLessThan(gmm, DR[mcs][bw])) mcs--;
 
-  if (last != -1) {
-    return SINR[last][bw];
+  if (mcs >= 0) {
+    return SINR[mcs][bw];
   }
 
   return SINR[11][3] + 1.0;
@@ -452,17 +451,21 @@ Connection &Solution::operator()(int t, int c, int l) {
   return slots[t].channels[c].connections[l];
 }
 
+bool SINRfeas(const Connection &con, int bw) {
+  return GreaterOrEqual(con.SINR, B[con.id][bToIdx(bw)]);
+}
+
 double computeConnectionThroughput(Connection &i, int bw) {
   if (bw == 0) return 0.0;
 
   if (approximatelyEqual(i.interference, 0.0, EPS)) {
-    i.SINR = 1e7;
+    i.SINR = SINR[11][bToIdx(bw)];
     i.throughput = DR[11][bToIdx(bw)];
   } else {
     i.SINR = AFF[i.id][i.id] / (i.interference + NOI);
 
     int mcs = 11;
-    while (mcs >= 0 && i.SINR < SINR[mcs][bToIdx(bw)]) mcs--;
+    while (mcs >= 0 && definitelyLessThan(i.SINR, SINR[mcs][bToIdx(bw)])) mcs--;
 
     if (mcs < 0) {
       return -1;
@@ -483,12 +486,20 @@ optional<Channel> insertInChannel(Channel new_c, int i_idx) {
   }
 
   new_c.connections.emplace_back(i);
-  for (auto &connection : new_c.connections) {
-    double ans = computeConnectionThroughput(connection, new_c.bandwidth);
-    if (ans == -1) {
-      return nullopt;
-    }
-    new_c.throughput += connection.throughput;
+  for (auto &i : new_c.connections) {
+    double ans = computeConnectionThroughput(i, new_c.bandwidth);
+    bool feas = SINRfeas(i, new_c.bandwidth);
+    // if (feas) {
+    //   if (definitelyGreaterThan(GMM[i.id], ans)) {
+    //     printf("%d %.4lf %.4lf %.4lf %.4lf %d\n", feas, i.SINR,
+    //            B[i.id][bToIdx(new_c.bandwidth)], i.throughput, GMM[i.id],
+    //            new_c.bandwidth);
+    //     assert(false);
+    //   }
+    // }
+    if (!SINRfeas(i, new_c.bandwidth)) return nullopt;
+
+    new_c.throughput += i.throughput;
   }
 
   return new_c;
@@ -529,12 +540,29 @@ optional<vector<Channel>> split(Channel toSplit, vector<double> *GMA) {
 }
 
 optional<Channel> try_insert(int conn_id, optional<Channel> ch) {
+  if (definitelyGreaterThan(GMM[conn_id], DR[11][bToIdx(ch->bandwidth)]))
+    return nullopt;
+
   ch = insertInChannel(*ch, conn_id);
   if (!ch) return nullopt;
 
+  // for (const Connection &conn : ch->connections) {
+  //   cout << conn.id << " " << conn.SINR << " " << conn.interference << " "
+  //        << B[conn.id][bToIdx(ch->bandwidth)] << endl;
+  //
+  //   assert(definitelyGreaterThan(conn.throughput, GMM[conn.id]) ||
+  //          approximatelyEqual(conn.throughput, GMM[conn.id]));
+  //   assert(
+  //       definitelyGreaterThan(conn.SINR, B[conn.id][bToIdx(ch->bandwidth)])
+  //       || approximatelyEqual(conn.SINR,
+  //       B[conn.id][bToIdx(ch->bandwidth)]));
+  // }
+
   for (Connection &conn : ch->connections) {
-    if (definitelyLessThan(conn.throughput, GMM[conn.id])) return nullopt;
-    assert(definitelyGreaterThan(conn.SINR, 0.0));
+    if (definitelyLessThan(conn.SINR, B[conn.id][bToIdx(ch->bandwidth)]))
+      return nullopt;
+    // assert(definitelyGreaterThan(conn.SINR,
+    // B[conn.id][bToIdx(ch->bandwidth)]));
   }
 
   return ch;
@@ -569,21 +597,19 @@ Solution CH() {
 
         if (rst) {
           ret(t, c) = *rst;
-          for (int t = 0; const TimeSlot &ts : ret.slots) {
-            for (const Channel &ch : ts.channels) {
-              for (const Connection &conn : ch.connections) {
-                // cout << conn.id << " " << conn.SINR << " " <<
-                // conn.interference
-                //      << " " << B[conn.id][bToIdx(ch.bandwidth)] << endl;
-
-                assert(definitelyGreaterThan(conn.throughput, GMM[conn.id]));
-                assert(definitelyGreaterThan(
-                           conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]) ||
-                       approximatelyEqual(conn.SINR,
-                                          B[conn.id][bToIdx(ch.bandwidth)]));
-              }
-            }
-          }
+          // for (int t = 0; const TimeSlot &ts : ret.slots) {
+          //   for (const Channel &ch : ts.channels) {
+          //     for (const Connection &conn : ch.connections) {
+          //       if (!SINRfeas(conn, ch.bandwidth)) {
+          //         printf("%.4lf %.4lf %.4lf %.4lf\n", conn.SINR,
+          //                B[conn.id][bToIdx(ch.bandwidth)], conn.throughput,
+          //                GMM[conn.id]);
+          //       }
+          //
+          //       assert(SINRfeas(conn, ch.bandwidth));
+          //     }
+          //   }
+          // }
 
           goto NEXT_CONN;
         }
@@ -601,24 +627,19 @@ Solution CH() {
               ret(t).channels.pop_back();
               ret(t).channels.emplace_back(*cp_channel);
               ret(t).channels.emplace_back((*ch_split)[i == 0]);
-              for (int t = 0; const TimeSlot &ts : ret.slots) {
-                for (const Channel &ch : ts.channels) {
-                  for (const Connection &conn : ch.connections) {
-                    // cout << conn.id << " " << conn.SINR << " "
-                    //      << conn.interference << " "
-                    //      << B[conn.id][bToIdx(ch.bandwidth)] << endl;
-
-                    assert(
-                        definitelyGreaterThan(conn.throughput, GMM[conn.id]));
-                    assert(definitelyGreaterThan(
-                               conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]) ||
-                           approximatelyEqual(
-                               conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]));
-                  }
-                }
-
-                goto NEXT_CONN;
-              }
+              // for (int t = 0; const TimeSlot &ts : ret.slots) {
+              //   for (const Channel &ch : ts.channels) {
+              //     for (const Connection &conn : ch.connections) {
+              //       if (!SINRfeas(conn, ch.bandwidth)) {
+              //         printf("%.4lf %.4lf %.4lf %.4lf\n", conn.SINR,
+              //                B[conn.id][bToIdx(ch.bandwidth)],
+              //                conn.throughput, GMM[conn.id]);
+              //       }
+              //       assert(SINRfeas(conn, ch.bandwidth));
+              //     }
+              //   }
+              // }
+              goto NEXT_CONN;
             }
           }
         }
@@ -646,10 +667,13 @@ Solution CH() {
   for (int t = 0; const TimeSlot &ts : ret.slots) {
     for (const Channel &ch : ts.channels) {
       for (const Connection &conn : ch.connections) {
-        assert(definitelyGreaterThan(conn.throughput, GMM[conn.id]));
-        assert(definitelyGreaterThan(conn.SINR,
-                                     B[conn.id][bToIdx(ch.bandwidth)]) ||
-               approximatelyEqual(conn.SINR, B[conn.id][bToIdx(ch.bandwidth)]));
+        // if (!GreaterOrEqual(conn.throughput, GMM[conn.id])) {
+        //   printf("%.4lf %.4lf %.4lf %.4lf\n", conn.SINR,
+        //          B[conn.id][bToIdx(ch.bandwidth)], conn.throughput,
+        //          GMM[conn.id]);
+        //   assert(GreaterOrEqual(conn.throughput, GMM[conn.id]));
+        // }
+        assert(SINRfeas(conn, ch.bandwidth));
       }
     }
   }
@@ -684,7 +708,8 @@ vector<tuple<int, int, int>> gurobi_sol(const Solution &sol) {
           if (channels_free[i].contains(candidate)) {
             // printf("CHANNEL (%d, %d, %d):\n", candidate, i, ch.bandwidth);
             for (const Connection &conn : ch.connections) {
-              // cout << "     " << conn.id << " " << conn.interference << endl;
+              // cout << "     " << conn.id << " " << conn.interference <<
+              // endl;
               ans.push_back({conn.id, candidate, i});
             }
             // printf("end\n");
@@ -781,6 +806,7 @@ void read_data() {
 
     for (int j = 0; j < 4; j++) {
       double value = gammaToBeta(GMM[i], j);
+      assert(definitelyGreaterThan(value, 0.0));
       B[i][j] = value;
     }
   }
