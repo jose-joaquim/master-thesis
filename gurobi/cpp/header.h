@@ -207,13 +207,11 @@ double convertDBMToMW(double _value) {
 }
 
 double gammaToBeta(double gmm, int bw) {
-  int mcs = 11;
+  int mcs = 0;
 
-  while (mcs >= 0 && definitelyLessThan(gmm, DR[mcs][bw])) mcs--;
+  while (mcs < 12 && definitelyGreaterThan(gmm, DR[mcs][bw])) mcs++;
 
-  if (mcs >= 0) {
-    return SINR[mcs][bw];
-  }
+  if (mcs < 12) return SINR[mcs][bw];
 
   return SINR[11][3] + 1.0;
 }

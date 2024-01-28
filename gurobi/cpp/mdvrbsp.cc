@@ -78,13 +78,18 @@ inline void var_z(GRBModel *model, mt3 &z) {
 // -------------- constraints ------------------
 
 inline void symmetry1(GRBModel *model, GRBVar *t) {
+  int cnt = 0;
   for (int i = 0; i < T - 1; ++i) {
     string name = "ts" + to_string(i);
     model->addConstr(t[i + 1] <= t[i], name);
+    cnt++;
   }
+
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void symmetry2(GRBModel *model, mt3 &x) {
+  int cnt = 0;
   for (int t = 0; t < T; ++t) {
     for (int i = 0; i < N; ++i) {
       if (i < t) {
@@ -97,13 +102,15 @@ inline void symmetry2(GRBModel *model, mt3 &x) {
 
         string name = "swap[" + to_string(t) + "," + to_string(i) + "]";
         model->addConstr(expr == 0, name);
+        cnt++;
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void unique(GRBModel *model, mt3 &x) {
-  cout << "unique" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
@@ -114,11 +121,13 @@ inline void unique(GRBModel *model, mt3 &x) {
 
     string name = "unique[" + to_string(i) + "]";
     model->addConstr(expr == 1, name);
+    cnt++;
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
-  cout << "waste" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     for (int _t = 0; _t < T; ++_t) {
       GRBLinExpr expr = 0;
@@ -127,12 +136,14 @@ inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
 
       string name = "waste[" + to_string(i) + "," + to_string(_t) + "]";
       model->addConstr(expr <= t[_t], name);
+      cnt++;
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
-  cout << "overlap" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     for (int c1 = 0; c1 < C; ++c1) {
       if (!canTransmitUsing(i, c1)) continue;
@@ -146,13 +157,15 @@ inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
         string name = "over[" + to_string(i) + "," + to_string(c1) + "," +
                       to_string(t) + "]";
         model->addConstr(expr == z[{i, c1, t}], name);
+        cnt++;
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
-  cout << "interch" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     for (int t = 0; t < T; ++t) {
       for (int c = 0; c < C; ++c) {
@@ -167,13 +180,15 @@ inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
         string name = "interch[" + to_string(i) + "," + to_string(c) + "," +
                       to_string(t) + "]";
         model->addConstr(expr == Iij[{i, c, t}], name);
+        cnt++;
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
-  cout << "bigG" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsing(i, c)) continue;
@@ -183,13 +198,15 @@ inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
                       to_string(t) + "]";
         model->addConstr(I[i] >= Iij[{i, c, t}] - BM[i] * (1 - x[{i, c, t}]),
                          name);
+        cnt++;
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
-  cout << "bigL" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsing(i, c)) continue;
@@ -199,13 +216,15 @@ inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
                       to_string(t) + "]";
         model->addConstr(I[i] <= Iij[{i, c, t}] + BM[i] * (1 - x[{i, c, t}]),
                          name);
+        cnt++;
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
-  cout << "sinr" << endl;
+  int cnt = 0;
   for (int i = 0; i < N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
@@ -218,11 +237,13 @@ inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
 
     string name = "sinr[" + to_string(i) + "]";
     model->addConstr(I[i] <= expr, name);
+    cnt++;
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
-  cout << "pairwise" << endl;
+  int cnt = 0;
   using ptv = pair<tuple<int, int, int>, GRBVar>;
   vector<vector<ptv>> var_l(N, vector<ptv>());
 
@@ -254,11 +275,15 @@ inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
             expr += var_j;
           }
 
-          if (any) model->addConstr(expr <= 1);
+          if (any) {
+            model->addConstr(expr <= 1);
+            cnt++;
+          }
         }
       }
     }
   }
+  printf("%s %d\n", __func__, cnt);
 }
 
 void fix_variables(GRBModel *model, mt3 &x, string file_name) {
@@ -351,8 +376,8 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
     // constraints
     model->update();
     printf("constraints...\n");
-    // symmetry1(model, t);
-    // symmetry2(model, x);
+    symmetry1(model, t);
+    symmetry2(model, x);
     unique(model, x);
     waste(model, x, t);
     ch_overlap(model, z, x);
@@ -368,12 +393,12 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
     // optimize
     model->update();
 
-    for (const auto &idx : gurobi_sol(sol)) {
-      if (fix)
-        model->addConstr(x[idx] >= 1.0);
-      else
-        x[idx].set(GRB_DoubleAttr_Start, 1.0);
-    }
+    // for (const auto &idx : gurobi_sol(sol)) {
+    //   if (fix)
+    //     model->addConstr(x[idx] >= 1.0);
+    //   else
+    //     x[idx].set(GRB_DoubleAttr_Start, 1.0);
+    // }
 
     // model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_TimeLimit, 3600);
