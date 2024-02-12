@@ -473,11 +473,11 @@ int main(int argc, char **argv) {
   duration<double> ms_double = stop - start;
   cout << "ch " << ms_double.count() << endl;
 
-  // FILE *ch_obj = fopen("ch_obj", "a");
-  // fprintf(ch_obj, "%u\t%lf\n", T, ms_double.count());
-  // fclose(ch_obj);
-  // return 0;
+  FILE *ch_obj = fopen("ch_obj", "a");
+  fprintf(ch_obj, "%s\t%u\t%lf\n", argv[2], T, ms_double.count());
+  fclose(ch_obj);
+  return 0;
 
-  double obj = run(argv, true, sol, false);
+  double obj = run(argv, true, sol, true);
   return 0;
 }

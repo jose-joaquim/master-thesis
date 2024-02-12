@@ -589,7 +589,8 @@ Solution CH() {
   shuffle(links.begin(), links.end(), whatever);
 
   for (int conn : links) {
-    for (int t = 0; t < ret.slots.size(); t++)
+    for (int t = 0; t < ret.slots.size(); t++) {
+      if (conn < t) continue;
       for (int c = 0; c < ret(t).channels.size(); c++) {
         auto rst = try_insert(conn, ret(t, c));
 
@@ -642,6 +643,7 @@ Solution CH() {
           }
         }
       }
+    }
 
     {
       TimeSlot new_ts{dummy_ts};
@@ -696,32 +698,31 @@ vector<tuple<int, int, int>> gurobi_sol(const Solution &sol) {
 
   vector<set<int>> channels_free(sol.slots.size(), allow_tmp);
 
-  for (const TimeSlot &ts : sol.slots) {
+  for (int ts_idx = 0; const TimeSlot &ts : sol.slots) {
     for (const Channel &ch : ts.channels) {
       if (ch.connections.empty()) continue;
 
-      bool none = true;
-      for (int i = 0; i < channels_free.size() && none; ++i) {
-        for (const int candidate : C_b[bToIdx(ch.bandwidth)]) {
-          if (channels_free[i].contains(candidate)) {
-            // printf("CHANNEL (%d, %d, %d):\n", candidate, i, ch.bandwidth);
-            for (const Connection &conn : ch.connections) {
-              // cout << "     " << conn.id << " " << conn.interference <<
-              // endl;
-              ans.push_back({conn.id, candidate, i});
-            }
-            // printf("end\n");
-
-            for (int j = 0; j < 45; ++j)
-              if (overlap[candidate][j]) channels_free[i].erase(j);
-
-            none = false;
+      bool inserted = false;
+      for (const int candidate : C_b[bToIdx(ch.bandwidth)]) {
+        if (channels_free[ts_idx].contains(candidate)) {
+          // printf("CHANNEL (%d, %d, %d):\n", candidate, i, ch.bandwidth);
+          for (const Connection &conn : ch.connections) {
+            // cout << "     " << conn.id << " " << conn.interference <<
+            // endl;
+            ans.push_back({conn.id, candidate, ts_idx});
+            inserted = true;
           }
+          // printf("end\n");
 
-          if (!none) break;
+          for (int j = 0; j < 45; ++j)
+            if (overlap[candidate][j]) channels_free[ts_idx].erase(j);
+
+          break;
         }
       }
+      assert(inserted);
     }
+    ts_idx++;
   }
 
   return ans;
