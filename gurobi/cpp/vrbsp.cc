@@ -43,7 +43,7 @@ inline void var_y(GRBModel *model, mt3 &y, vector<int> &conns) {
         if (canTransmitUsingBandwidth(i, b, m)) {
           string name = "y[" + to_string(i) + "," + to_string(b) + "," +
                         to_string(m) + "]";
-          y[{i, b, m}] = model->addVar(0.0, 1.0, DR[m][b], GRB_BINARY, name);
+          y[{i, b, m}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
           cnt++;
         }
       }
@@ -59,7 +59,7 @@ inline void var_x(GRBModel *model, mt2 &x, vector<int> &conns) {
     for (int c = 0; c < C; ++c) {
       if (canTransmitUsingChannel(i, c)) {
         string name = "x[" + to_string(i) + "," + to_string(c) + "]";
-        x[{i, c}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+        x[{i, c}] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
         cnt++;
       }
     }
