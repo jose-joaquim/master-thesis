@@ -240,7 +240,6 @@ int main(int argc, char **argv) {
   FILE *solFile = fopen(solFileName.c_str(), "a");
   while (off > 0) {
     auto start = std::chrono::steady_clock::now();
-    OF++;
 
     vector<int> l_to_idx;
     for (int i = 0, idx = l_to_idx.size(); i < N; ++i)
@@ -274,12 +273,15 @@ int main(int argc, char **argv) {
     model->set(GRB_DoubleParam_TimeLimit,
                min(600.0, max(0.0, 3600.0 - elapsed)));
     model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
-    // model->set(GRB_IntParam_LogToConsole, 0);
+    model->set(GRB_IntParam_LogToConsole, 0);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->update();
     model->optimize();
 
     if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
+      if (model->get(GRB_IntAttr_SolCount) == 0) break;
+
+      OF++;
       bool at_least_one = false;
       for (auto seila : x) {
         auto &[i, c] = seila.first;
@@ -319,6 +321,7 @@ int main(int argc, char **argv) {
   }
 
   fclose(solFile);
+  if (scheduled.size() != N) OF += N - scheduled.size();
 
   FILE *obj = fopen("obj", "a");
   fprintf(obj, "%s\t%d\t%.3lf\n", argv[2], OF, elapsed);
