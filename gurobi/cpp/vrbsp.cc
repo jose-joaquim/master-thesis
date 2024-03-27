@@ -271,9 +271,14 @@ int main(int argc, char **argv) {
     // optimize
 
     model->set(GRB_DoubleParam_TimeLimit,
-               min(600.0, max(0.0, 3600.0 - elapsed)));
+               min(120.0, max(0.0, 7200.0 - elapsed)));
     model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
-    model->set(GRB_IntParam_LogToConsole, 0);
+    // model->set(GRB_IntParam_LogToConsole, 0);
+    model->set(GRB_IntParam_MIPFocus, 1);
+    model->set(GRB_DoubleParam_NoRelHeurWork, 60);
+    model->set(GRB_DoubleParam_Heuristics, .90);
+    model->set(GRB_DoubleParam_ImproveStartTime, 0.0);
+
     model->set(GRB_DoubleParam_IntFeasTol, 1e-5);
     model->update();
     model->optimize();
