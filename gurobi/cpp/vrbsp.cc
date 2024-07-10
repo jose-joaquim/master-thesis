@@ -43,7 +43,11 @@ inline void var_y(GRBModel *model, mt3 &y, vector<int> &conns) {
         if (canTransmitUsingBandwidth(i, b, m)) {
           string name = "y[" + to_string(i) + "," + to_string(b) + "," +
                         to_string(m) + "]";
+#ifdef ORIG_OF
+          y[{i, b, m}] = model->addVar(0.0, 1.0, DR[b][m], GRB_BINARY, name);
+#else
           y[{i, b, m}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+#endif
           cnt++;
         }
       }
@@ -59,7 +63,11 @@ inline void var_x(GRBModel *model, mt2 &x, vector<int> &conns) {
     for (int c = 0; c < C; ++c) {
       if (canTransmitUsingChannel(i, c)) {
         string name = "x[" + to_string(i) + "," + to_string(c) + "]";
+#ifdef ORIG_OF
+        x[{i, c}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
+#else
         x[{i, c}] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
+#endif
         cnt++;
       }
     }
@@ -228,6 +236,49 @@ inline void sinr(GRBModel *model, GRBVar *I, mt2 &x, vector<int> &conns) {
   }
 }
 
+inline void pairwise(GRBModel *model, mt2 &x, mt2 &z) {
+  int cnt = 0;
+  using ptv = pair<tuple<int, int>, GRBVar>;
+  vector<vector<ptv>> var_l(N, vector<ptv>());
+
+  for (const auto &[key_x, var_x] : x) {
+    const auto &[l_x, c_x] = key_x;
+    var_l[l_x].push_back(make_pair(key_x, var_x));
+  }
+
+  for (int i = 0; i < N; ++i) {
+    for (const auto &[key_i, var_i] : var_l[i]) {
+      const auto &[_, c_i] = key_i;
+      for (int j = 0; j < N; ++j) {
+        if (i == j) continue;
+
+        int bw_idx = cToBIdx(c_i);
+        double aff = B[i][bw_idx] * AFF[j][i] / AFF[i][i];
+        if (definitelyGreaterThan(aff, 1.0)) {
+          GRBLinExpr expr = var_i;
+          bool any = false;
+
+          for (const auto &[key_j, var_j] : var_l[j]) {
+            const auto &[l_j, c_j] = key_j;
+
+            int bw_idx_2 = cToBIdx(c_j);
+            if (!overlap[c_i][c_j] || bw_idx != bw_idx_2) continue;
+
+            any = true;
+            expr += var_j;
+          }
+
+          if (any) {
+            model->addConstr(expr <= 1);
+            cnt++;
+          }
+        }
+      }
+    }
+  }
+  printf("%s %d\n", __func__, cnt);
+}
+
 int main(int argc, char **argv) {
   freopen(argv[3], "r", stdin);
   printf("opening %s\n", argv[3]);
@@ -268,6 +319,11 @@ int main(int argc, char **argv) {
     bigG(model, I, Iij, x, l_to_idx);
     bigL(model, I, Iij, x, l_to_idx);
     sinr(model, I, x, l_to_idx);
+
+#ifndef ORIG_OF
+    pairwise(model, x, z);
+#endif
+
     // optimize
 
     model->set(GRB_DoubleParam_TimeLimit,
