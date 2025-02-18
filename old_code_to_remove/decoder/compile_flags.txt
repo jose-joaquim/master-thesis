@@ -1,0 +1,5 @@
+-xc++
+-std=c++2a
+-I/Library/gurobi1101/macos_universal2/include
+-I/opt/homebrew/Cellar/libomp/18.1.8/include
+-DMDVRBSP

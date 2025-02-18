@@ -12,3 +12,5 @@
 **/.ipynb_checkpoints
 **/*.eps
 **/bin/
+**/build/
+**/cmake/

@@ -1,4 +1,0 @@
--xc++
--std=c++2a
--I/Library/gurobi1002/macos_universal2/include
--DMDVRBSP
