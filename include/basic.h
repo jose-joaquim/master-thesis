@@ -4,6 +4,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdio>
+#include <map>
 #include <random>
 #include <set>
 #include <tuple>
@@ -20,11 +21,13 @@ using namespace std;
 using namespace std::chrono;
 using hrc = std::chrono::high_resolution_clock;
 using dii = pair<double, pair<int, int>>;
+using misi = map<int, unordered_set<int>>;
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 #include "gurobi_c++.h"
 
 using mt3 = map<tuple<int, int, int>, GRBVar>;
+using mt2 = map<tuple<int, int>, GRBVar>;
 #endif
 
 using ii = pair<int, int>;
@@ -223,15 +226,33 @@ bool canTransmitUsingBandwidth(int, int, int);
 int cToBIdx(int);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
-void var_Iij(GRBModel *, mt3 &);
+void var_Iij(GRBModel *, mt3 &, vector<int> &, misi &);
 
-void var_z(GRBModel *, mt3 &z);
+void var_z(GRBModel *, mt3 &z, vector<int> &, misi &);
 
-void var_I(GRBModel *, GRBVar *&);
+void var_I(GRBModel *, GRBVar *, vector<int> &, misi &);
 
-void var_t(GRBModel *, GRBVar *&);
+void var_t(GRBModel *, GRBVar *, vector<int> &, misi &);
 
-void var_x(GRBModel *, mt3 &);
+void var_x(GRBModel *, mt3 &, vector<int> &, misi &);
+
+void var_y(GRBModel *, mt3 &, vector<int> &, misi &);
+
+void unique(GRBModel *, mt3 &, vector<int> &, misi &);
+
+void couple(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+
+void ch_overlap(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+
+void interch(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+
+void bigG(GRBModel *, mt3 &, mt3 &, mt3 &, vector<int> &, misi &);
+
+void bigL(GRBModel *, mt3 &, mt3 &, mt3 &, vector<int> &, misi &);
+
+void sinr(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+
+Solution vrbsp(misi &);
 #endif
 
 #endif

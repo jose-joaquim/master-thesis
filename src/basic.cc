@@ -402,19 +402,6 @@ Solution CH_MDVRBSP() {
 
         if (rst) {
           ret(t, c) = *rst;
-          // for (int t = 0; const TimeSlot &ts : ret.slots) {
-          //   for (const Channel &ch : ts.channels) {
-          //     for (const Connection &conn : ch.connections) {
-          //       if (!SINRfeas(conn, ch.bandwidth)) {
-          //         printf("%.4lf %.4lf %.4lf %.4lf\n", conn.SINR,
-          //                B[conn.id][bToIdx(ch.bandwidth)], conn.throughput,
-          //                GMM[conn.id]);
-          //       }
-          //
-          //       assert(SINRfeas(conn, ch.bandwidth));
-          //     }
-          //   }
-          // }
 
           goto NEXT_CONN;
         }
@@ -433,18 +420,6 @@ Solution CH_MDVRBSP() {
               ret(t).channels.pop_back();
               ret(t).channels.emplace_back(*cp_channel);
               ret(t).channels.emplace_back((*ch_split)[i == 0]);
-              // for (int t = 0; const TimeSlot &ts : ret.slots) {
-              //   for (const Channel &ch : ts.channels) {
-              //     for (const Connection &conn : ch.connections) {
-              //       if (!SINRfeas(conn, ch.bandwidth)) {
-              //         printf("%.4lf %.4lf %.4lf %.4lf\n", conn.SINR,
-              //                B[conn.id][bToIdx(ch.bandwidth)],
-              //                conn.throughput, GMM[conn.id]);
-              //       }
-              //       assert(SINRfeas(conn, ch.bandwidth));
-              //     }
-              //   }
-              // }
               goto NEXT_CONN;
             }
           }
@@ -656,7 +631,6 @@ void reinsert(Solution &sol, Connection conn, ii from, ii to) {
   sol.throughput_ = sol.throughput_ + obj_part_add - obj_part_remove;
 }
 
-#if defined(USE_VNS_PURE)
 void K_RemoveAndInserts(Solution &sol, int K) {
   int k = 0;
 
@@ -718,6 +692,59 @@ void K_AddDrop(Solution &sol, int K) {
   }
 }
 
+Solution perturbation(Solution &sol, int kkmul) {
+  int rnd = dist(gen) % 2;
+  if (rnd)
+    K_AddDrop(sol, kkmul);
+  else
+    K_RemoveAndInserts(sol, kkmul);
+
+  computeThroughput(sol);
+
+  return sol;
+}
+
+Solution convertTo20MhzSol(Solution exps) {
+  auto cmp_channels = [](Channel &a, Channel &b) {
+    return a.bandwidth < b.bandwidth;
+  };
+  sort(exps(0).channels.rbegin(), exps(0).channels.rend(), cmp_channels);
+  std::uniform_int_distribution<int> distribution(0, 1);
+  while (true) {
+    Channel *to_replace = 0;
+    for (Channel &c : exps(0).channels)
+      if (c.bandwidth > 20) {
+        to_replace = &c;
+        break;
+      }
+
+    if (!to_replace)
+      break;
+
+    Channel c1(to_replace->bandwidth / 2, {});
+    Channel c2 = c1;
+
+    for (const Connection &conn : to_replace->connections) {
+      if (distribution(whatever))
+        c1 = *insertInChannel(c1, conn.id, true);
+      else
+        c2 = *insertInChannel(c2, conn.id, true);
+    }
+
+    *to_replace = c1;
+    exps(0).channels.push_back(c2);
+  }
+
+  return exps;
+}
+
+int random_number(int max_num) { return dist(gen) % max_num; }
+
+bool stop(hrc::time_point from, double ub) {
+  return duration_cast<duration<double>>(hrc::now() - from).count() >= ub;
+}
+
+#if defined(USE_VNS_PURE)
 Solution multipleRepresentation(Solution ret) {
   for (int ts_idx = 0; TimeSlot & ts : ret.slots) {
     vector<Channel> &chs = ts.channels;
@@ -848,24 +875,6 @@ Solution CH_VRBSP() {
   return ret;
 }
 
-int random_number(int max_num) { return dist(gen) % max_num; }
-
-Solution perturbation(Solution &sol, int kkmul) {
-  int rnd = dist(gen) % 2;
-  if (rnd)
-    K_AddDrop(sol, kkmul);
-  else
-    K_RemoveAndInserts(sol, kkmul);
-
-  computeThroughput(sol);
-
-  return sol;
-}
-
-bool stop(hrc::time_point from, double ub) {
-  return duration_cast<duration<double>>(hrc::now() - from).count() >= ub;
-}
-
 double calcDP(Solution &sol, int t, int c, int depth) {
   // printf("node %d %d %d\n", t, c, depth);
   sol(t, c).in_solution = true;
@@ -879,53 +888,15 @@ double calcDP(Solution &sol, int t, int c, int depth) {
     double candidate = a + b;
 
     if (definitelyGreaterThan(candidate, ret)) {
-      // printf("%d (%.3lf) lt %d (%.3lf) %d (%.3lf)\n", c, ret, child1, a,
-      // child2, b);
       ret = candidate;
       sol(t, c).in_solution = false;
-    } //  else
-      // printf("%d (%.3lf) gt %d (%.3lf) %d (%.3lf)\n", c, ret, child1, a,
-      // child2, b);
+    }
   }
 
   return ret;
 }
 
 Solution rebuild_solution(Solution to_rebuild) { return to_rebuild; }
-
-Solution convertTo20MhzSol(Solution exps) {
-  auto cmp_channels = [](Channel &a, Channel &b) {
-    return a.bandwidth < b.bandwidth;
-  };
-  sort(exps(0).channels.rbegin(), exps(0).channels.rend(), cmp_channels);
-  std::uniform_int_distribution<int> distribution(0, 1);
-  while (true) {
-    Channel *to_replace = 0;
-    for (Channel &c : exps(0).channels)
-      if (c.bandwidth > 20) {
-        to_replace = &c;
-        break;
-      }
-
-    if (!to_replace)
-      break;
-
-    Channel c1(to_replace->bandwidth / 2, {});
-    Channel c2 = c1;
-
-    for (const Connection &conn : to_replace->connections) {
-      if (distribution(whatever))
-        c1 = *insertInChannel(c1, conn.id, true);
-      else
-        c2 = *insertInChannel(c2, conn.id, true);
-    }
-
-    *to_replace = c1;
-    exps(0).channels.push_back(c2);
-  }
-
-  return exps;
-}
 
 Channel erase_connection_from_channel(Channel ch, int id) {
   Channel ch_new = ch;
@@ -1024,10 +995,6 @@ Solution Solution::get_optimal_solution() {
 
 double optimal_partitioning_global(Solution &multiple) {
   computeThroughput(multiple);
-  // for (TimeSlot &ts : multiple.slots)
-  //   for (Channel &ch : ts.channels)
-  //     ch.in_solution = false;
-
   multiple.throughput_ = 0.0;
 
   for (int t = 0; t < multiple.slots.size(); ++t)
@@ -1048,8 +1015,6 @@ double optimal_partitioning_global_reduced(Solution &multiple, int t, int ch) {
 int insert_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
   double highest = -1;
   do {
-    // bool insertion_ok = sol.insert_connnection(i, ts, channel);
-    // assert(insertion_ok);
     sol(ts, channel).connections.push_back(Connection(i));
     channel = sol(ts, channel).parent;
 
@@ -1062,8 +1027,6 @@ int insert_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
 
 void erase_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
   do {
-    // bool deletion_ok = sol.remove_connection(i);
-    // assert(deletion_ok);
     bool deletion_ok = false;
     vector<Connection> &conns = sol(ts, channel).connections;
     for (int l = 0; l < conns.size() && !deletion_ok; ++l)
@@ -1075,10 +1038,6 @@ void erase_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
 
     channel = sol(ts, channel).parent;
   } while (channel != -1);
-
-  // // TODO: speed-up here
-  // bool deletion_ok = sol.remove_connection(i);
-  // assert(deletion_ok);
 }
 
 Solution local_search(const Solution &sol20) {
@@ -1118,9 +1077,6 @@ Solution local_search(const Solution &sol20) {
           continue;
 
         insert_connection_up_to_root(best_multiple, i, slot, channel);
-        // insert_connection_up_to_root(baseline, i, slot, channel);
-        // double seila = optimal_partitioning_global(baseline);
-        // assert(approximatelyEqual(seila, best_of_i.first));
       }
     }
 
@@ -1132,65 +1088,258 @@ Solution local_search(const Solution &sol20) {
   Solution ret = best_multiple.get_optimal_solution();
   assert(approximatelyEqual(aux, ret.throughput_));
 
-  // set<int> set_unscheduled;
-  // for (int i = 0; i < N; ++i)
-  //   set_unscheduled.insert(i);
-  //
-  // for (const TimeSlot &st : ret.slots)
-  //   for (const Channel &ch : st.channels)
-  //     for (const Connection &conn : ch.connections) {
-  //       assert(set_unscheduled.contains(conn.id));
-  //       set_unscheduled.erase(conn.id);
-  //     }
-
-  printf("entered %.3lf and outputs %.3lf\n", start_of, ret.throughput_);
+  // printf("entered %.3lf and outputs %.3lf\n", start_of, ret.throughput_);
   return ret;
 }
 
 #elif defined(VNS_MATH_SOLVER) || defined(USE_VRBSP_IP) ||                     \
     defined(USE_MDVRBSP_IP)
 
-// Build INTEGER PROGRAM
-vector<vector<int>> channels_per_spec = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 25, 26, 27, 28, 37, 38, 43},
-    {8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18,
-     19, 29, 30, 31, 32, 33, 34, 39, 40, 41, 44},
-    {20, 21, 22, 23, 24, 35, 36, 42}};
+vector<vector<int>> C_b = {
+    {
+        0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    },
+    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
+    {37, 38, 39, 40, 41, 42},
+    {43, 44},
+};
 
-Solution ls_math_optimizer(const Solution &tmp) {
-  Solution other;
-  // for (int idx = 0; const TimeSlot &ts : tmp.slots) {
-  //   for (int sp_idx = 0; const Spectrum &sp : ts.spectrums) {
-  //     vector<int> links;
-  //
-  //     for (const Channel &ch : sp.channels)
-  //       for (const Connection &conn : ch.connections)
-  //         links.emplace_back(conn.id);
-  //
-  //     if (links.empty())
-  //       continue;
-  //     auto rst = run_math_solver(links, channels_per_spec[sp_idx]);
-  //
-  //     // Loop over rst and insert the links in Solution `other`
-  //
-  //     exit(0);
-  //     sp_idx++;
-  //
-  //     // run gurobi within this spectrum
-  //   }
-  //
-  //   assert(idx++ == 1);
-  // }
-  return other;
+Solution local_search(const Solution &sol20) {
+  Solution best_found = sol20;
+  bool improved;
+  do {
+    improved = false;
+
+    for (int i = 0; i < N; ++i) {
+      misi mapping;
+
+      for (int c = 0; c < 45; ++c)
+        mapping[i].insert(c);
+
+      for (const TimeSlot &ts : sol20.slots)
+        for (const Channel &ch : ts.channels)
+          for (const Connection &conn : ch.connections)
+            if (conn.id != i)
+              for (int bw_ix = 1; bw_ix < 4; ++bw_ix)
+                for (int o_c : C_b[ch.ix])
+                  if (overlap[ch.ix][o_c])
+                    mapping[conn.id].insert(o_c);
+
+      Solution opt = vrbsp(mapping);
+      if (opt > best_found) {
+        // need to revert opt back to 20MHz
+        // best_found = revert(opt);
+        improved = true;
+      }
+    }
+
+    // Repeate while finding improvements
+  } while (improved);
+
+  return best_found;
 }
 
-void var_x(GRBModel *model, mt3 &x) {
+void couple(GRBModel *model, mt3 &y, mt2 &x, vector<int> &conns) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    for (int b = 0; b < 4; ++b) {
+      bool one = false, two = false;
+      GRBLinExpr expr = 0, expr1 = 0;
+
+      for (int m = 0; m < 12; ++m)
+        if (canTransmitUsingBandwidth(i, b, m)) {
+          one = true;
+          assert(y.find({i, b, m}) != y.end());
+          expr += y[{i, b, m}];
+        }
+
+      for (int c = 0; c < C_b[b].size(); ++c)
+        if (canTransmitUsingChannel(i, C_b[b][c])) {
+          two = true;
+          // assert(x.find({i, C_b[b][c]}) != x.end());
+          expr1 += x[{i, C_b[b][c]}];
+        }
+
+      assert(one == two);
+      if (!one) {
+        continue;
+      }
+
+      string name = "couple[" + to_string(i) + "," + to_string(b) + "]";
+      model->addConstr(expr <= expr1, name);
+    }
+  }
+}
+
+void unique(GRBModel *model, mt2 &x, vector<int> &conns) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    GRBLinExpr expr = 0;
+    for (int c = 0; c < C; ++c) {
+      if (!canTransmitUsingChannel(i, c))
+        continue;
+
+      expr += x[{i, c}];
+    }
+
+    string name = "unique[" + to_string(i) + "]";
+    model->addConstr(expr <= 1, name);
+  }
+}
+
+void ch_overlap(GRBModel *model, mt3 &z, mt3 &x, vector<int> &conns,
+                misi &maps) {
+  // for (int _i = 0; _i < conns.size(); ++_i) {
+  //   int i = conns[_i];
+  //   for (int c1 = 0; c1 < C; ++c1) {
+  //     if (!canTransmitUsingChannel(i, c1))
+  //       continue;
+  //
+  //     GRBLinExpr expr = 0;
+  //     for (int c2 = 0; c2 < C; ++c2) {
+  //       if (overlap[c1][c2] && canTransmitUsingChannel(i, c2))
+  //         expr += x[{i, c2}];
+  //     }
+  //
+  //     string name = "over[" + to_string(i) + "," + to_string(c1) + "]";
+  //     model->addConstr(expr == z[{i, c1}], name);
+  //   }
+  // }
+}
+
+void interch(GRBModel *model, mt2 &z, mt2 &Iij, vector<int> &conns) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    for (int c = 0; c < C; ++c) {
+      if (!canTransmitUsingChannel(i, c))
+        continue;
+
+      GRBLinExpr expr = 0;
+      for (int _u = 0; _u < conns.size(); ++_u) {
+        int u = conns[_u];
+        if (u != i && canTransmitUsingChannel(u, c))
+          expr += AFF[u][i] * z[{u, c}];
+      }
+
+      string name = "interch[" + to_string(i) + "," + to_string(c) + "]";
+      model->addConstr(expr == Iij[{i, c}], name);
+    }
+  }
+}
+
+void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x, vector<int> &conns,
+          misi &connections_channels) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    for (int c = 0; c < C; ++c) {
+      if (!canTransmitUsingChannel(i, c))
+        continue;
+
+      string name = "bigG[" + to_string(i) + "," + to_string(c) + "]";
+      // model->addConstr(I[i] >= Iij[{i, c}] - BM[i] * (1 - x[{i, c}]), name);
+    }
+  }
+}
+
+void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x, vector<int> &conns,
+          misi &connections_channels) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    for (int c = 0; c < C; ++c) {
+      if (!canTransmitUsingChannel(i, c))
+        continue;
+
+      string name = "bigL[" + to_string(i) + "," + to_string(c) + "]";
+      // model->addConstr(I[i] <= Iij[{i, c}] + BM[i] * (1 - x[{i, c}]), name);
+    }
+  }
+}
+
+void sinr(GRBModel *model, GRBVar *I, mt3 &x, vector<int> &conns,
+          misi &connections_channels) {
+  for (int _i = 0; _i < conns.size(); ++_i) {
+    int i = conns[_i];
+    GRBLinExpr expr = 0;
+    for (int c = 0; c < C; ++c) {
+      if (!canTransmitUsingChannel(i, c))
+        continue;
+
+      // expr += (AFF[i][i] / B[i][cToBIdx(c)] - NOI) * x[{i, c}];
+    }
+
+    string name = "sinr[" + to_string(i) + "]";
+    model->addConstr(I[i] <= expr, name);
+  }
+}
+
+Solution vrbsp(misi &connections_channels) {
+  GRBEnv env;
+  GRBModel *model = new GRBModel(env);
+  GRBVar *I, *t;
+  mt3 x, Iij, z;
+  mt3 y;
+
+  vector<int> links;
+  if (!connections_channels.empty())
+    for (const auto &[l, _] : connections_channels)
+      links.push_back(l);
+  else
+    for (int i = 0; i < N; ++i)
+      links.push_back(i);
+
+  // variables
+  // printf("variables...\n");
+  var_x(model, x, links, connections_channels);
+  var_z(model, z, links, connections_channels);
+  var_Iij(model, Iij, links, connections_channels);
+  var_I(model, I, links, connections_channels);
+  var_y(model, y, links, connections_channels);
+
+  // constraints
+  model->update();
+  // printf("constraints...\n");
+  unique(model, x, links, connections_channels);
+  couple(model, y, x, links, connections_channels);
+  ch_overlap(model, z, x, links, connections_channels);
+  interch(model, z, Iij, links, connections_channels);
+  bigG(model, I, Iij, x, links, connections_channels);
+  bigL(model, I, Iij, x, links, connections_channels);
+  sinr(model, I, x, links, connections_channels);
+
+  model->update();
+  model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
+
+  return Solution();
+};
+
+// Build INTEGER PROGRAM
+
+void var_y(GRBModel *model, mt3 &y, vector<int> &links,
+           misi &mapping_i_channels) {
+  for (int _i = 0; _i < links.size(); ++_i) {
+    int i = links[_i];
+
+    for (int b = 0; b < 4; ++b) {
+      for (int m = 0; m < 12; ++m) {
+        if (canTransmitUsingBandwidth(i, b, m)) {
+          string name =
+              "y" + to_string(i) + "," + to_string(b) + "," + to_string(m);
+          y[{i, b, m}] = model->addVar(0.0, 1.0, DR[b][m], GRB_BINARY, name);
+        }
+      }
+    }
+  }
+}
+
+void var_x(GRBModel *model, mt3 &x, vector<int> &links,
+           misi &mapping_i_channels) {
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
-      if (canTransmitUsingChannel(i, c)) {
+      if (canTransmitUsingChannel(i, c) && mapping_i_channels[i].contains(c)) {
         for (int t = 0; t < T; ++t) {
-          string name = "x[" + to_string(i) + "," + to_string(c) + "," +
-                        to_string(t) + "]";
+          string name =
+              "x" + to_string(i) + "," + to_string(c) + "," + to_string(t);
           x[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
         }
       }
@@ -1198,29 +1347,32 @@ void var_x(GRBModel *model, mt3 &x) {
   }
 }
 
-void var_t(GRBModel *model, GRBVar *&t) {
+void var_t(GRBModel *model, GRBVar *t, vector<int> &links,
+           misi &mapping_i_channels) {
   t = new GRBVar[T];
   for (int i = 0; i < T; ++i) {
-    string name = "t[" + to_string(i) + "]";
+    string name = "t" + to_string(i);
     t[i] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
   }
 }
 
-void var_I(GRBModel *model, GRBVar *&I) {
+void var_I(GRBModel *model, GRBVar *&I, vector<int> &links,
+           misi &mapping_i_channels) {
   I = new GRBVar[N];
   for (int i = 0; i < N; ++i) {
-    string name = "I[" + to_string(i) + "]";
+    string name = "I" + to_string(i);
     I[i] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
   }
 }
 
-void var_Iij(GRBModel *model, mt3 &Iij) {
+void var_Iij(GRBModel *model, mt3 &Iij, vector<int> &links,
+             misi &mapping_i_channels) {
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
-      if (canTransmitUsingChannel(i, c)) {
+      if (canTransmitUsingChannel(i, c) && mapping_i_channels[i].contains(c)) {
         for (int t = 0; t < T; ++t) {
-          string name = "Iij[" + to_string(i) + "," + to_string(c) + "," +
-                        to_string(t) + "]";
+          string name =
+              "Iij" + to_string(i) + "," + to_string(c) + "," + to_string(t);
           Iij[{i, c, t}] =
               model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, name);
         }
@@ -1229,13 +1381,14 @@ void var_Iij(GRBModel *model, mt3 &Iij) {
   }
 }
 
-void var_z(GRBModel *model, mt3 &z) {
+void var_z(GRBModel *model, mt3 &z, vector<int> &links,
+           misi &mapping_i_channels) {
   for (int i = 0; i < N; ++i) {
     for (int c = 0; c < C; ++c) {
-      if (canTransmitUsingChannel(i, c)) {
+      if (canTransmitUsingChannel(i, c) && mapping_i_channels[i].contains(c)) {
         for (int t = 0; t < T; ++t) {
-          string name = "z[" + to_string(i) + "," + to_string(c) + "," +
-                        to_string(t) + "]";
+          string name =
+              "z" + to_string(i) + "," + to_string(c) + "," + to_string(t);
           z[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
         }
       }
@@ -1307,52 +1460,6 @@ bool canTransmitUsingBandwidth(int i, int b, int m) {
 }
 
 vector<string> gurobi_sol(const Solution &sol) {
-  // vector<vector<int>> C_b = {
-  //     {
-  //         0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-  //         13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-  //     },
-  //     {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
-  //     {37, 38, 39, 40, 41, 42},
-  //     {43, 44},
-  // };
-  //
-  // vector<tuple<int, int, int>> ans;
-  // set<int> allow_tmp;
-  // for (int i = 0; i < 45; ++i)
-  //   allow_tmp.insert(i);
-  //
-  // vector<set<int>> channels_free(sol.slots.size(), allow_tmp);
-  //
-  // for (int ts_idx = 0; const TimeSlot &ts : sol.slots) {
-  //   for (const Channel &ch : ts.channels) {
-  //     if (ch.connections.empty())
-  //       continue;
-  //
-  //     bool inserted = false;
-  //     for (const int candidate : C_b[bToIdx(ch.bandwidth)]) {
-  //       if (channels_free[ts_idx].contains(candidate)) {
-  //         // printf("CHANNEL (%d, %d, %d):\n", candidate, i, ch.bandwidth);
-  //         for (const Connection &conn : ch.connections) {
-  //           // cout << "     " << conn.id << " " << conn.interference <<
-  //           // endl;
-  //           ans.push_back({conn.id, candidate, ts_idx});
-  //           inserted = true;
-  //         }
-  //         // printf("end\n");
-  //
-  //         for (int j = 0; j < 45; ++j)
-  //           if (overlap[candidate][j])
-  //             channels_free[ts_idx].erase(j);
-  //
-  //         break;
-  //       }
-  //     }
-  //     assert(inserted);
-  //   }
-  //   ts_idx++;
-  // }
-
   vector<string> ans;
   for (int ts_ix = 0; const TimeSlot &ts : sol.slots) {
     for (const Channel &ch : ts.channels)

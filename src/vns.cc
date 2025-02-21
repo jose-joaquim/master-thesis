@@ -42,12 +42,17 @@ Solution vns() {
   }
 
   fclose(progress_file);
+#if defined(USE_VNS_PURE)
   Solution best_multiple = multipleRepresentation(inc_20);
   double of = optimal_partitioning_global(best_multiple);
 
   assert(approximatelyEqual(of, inc_20.throughput_));
   inc = best_multiple.get_optimal_solution();
   auto math_sol = gurobi_sol(inc);
+
+#else
+  assert(false);
+#endif
 
   return inc;
 }
