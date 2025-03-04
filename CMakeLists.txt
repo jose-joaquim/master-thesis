@@ -48,7 +48,7 @@ if(USE_VNS_MATH_SOLVER
 endif()
 
 if(USE_VNS_MATH_SOLVER)
-  target_compile_definitions(basic PUBLIC VNS_MATH_SOLVER)
+  target_compile_definitions(basic PUBLIC USE_VNS_MATH_SOLVER)
   find_package(GUROBI REQUIRED)
   add_executable(vns_math_solver "./src/vns.cc")
 

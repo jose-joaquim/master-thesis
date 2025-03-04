@@ -28,6 +28,13 @@ using misi = map<int, unordered_set<int>>;
 
 using mt3 = map<tuple<int, int, int>, GRBVar>;
 using mt2 = map<tuple<int, int>, GRBVar>;
+using mivar = map<int, GRBVar>;
+using seila = map<int, mivar>;
+using seila2 = map<int, seila>;
+using seila3 = map<int, seila2>;
+using x_structure = vector<seila>;
+using y_structure = vector<seila2>;
+
 #endif
 
 using ii = pair<int, int>;
@@ -226,31 +233,31 @@ bool canTransmitUsingBandwidth(int, int, int);
 int cToBIdx(int);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
-void var_Iij(GRBModel *, mt3 &, vector<int> &, misi &);
+void var_Iij(GRBModel *, seila2 &, misi &);
 
-void var_z(GRBModel *, mt3 &z, vector<int> &, misi &);
+void var_z(GRBModel *, seila2 &, misi &);
 
-void var_I(GRBModel *, GRBVar *, vector<int> &, misi &);
+void var_I(GRBModel *, mivar &, misi &);
 
 void var_t(GRBModel *, GRBVar *, vector<int> &, misi &);
 
-void var_x(GRBModel *, mt3 &, vector<int> &, misi &);
+void var_x(GRBModel *, seila2 &, misi &);
 
-void var_y(GRBModel *, mt3 &, vector<int> &, misi &);
+void var_y(GRBModel *, seila3 &, misi &);
 
-void unique(GRBModel *, mt3 &, vector<int> &, misi &);
+void unique(GRBModel *, seila2 &);
 
-void couple(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+void couple(GRBModel *, seila3 &, seila2 &);
 
-void ch_overlap(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+void ch_overlap(GRBModel *, mt3 &, mt3 &);
 
-void interch(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+void interch(GRBModel *, mt3 &, mt3 &);
 
-void bigG(GRBModel *, mt3 &, mt3 &, mt3 &, vector<int> &, misi &);
+void bigG(GRBModel *, mt2 &, mt3 &, mt3 &);
 
-void bigL(GRBModel *, mt3 &, mt3 &, mt3 &, vector<int> &, misi &);
+void bigL(GRBModel *, mt2 &, mt3 &, mt3 &);
 
-void sinr(GRBModel *, mt3 &, mt3 &, vector<int> &, misi &);
+void sinr(GRBModel *, mt2 &, mt3 &);
 
 Solution vrbsp(misi &);
 #endif
