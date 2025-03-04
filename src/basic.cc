@@ -1101,16 +1101,6 @@ Solution local_search(const Solution &sol20) {
 
 #elif defined(USE_VNS_MATH_SOLVER)
 
-vector<unordered_set<int>> C_b = {
-    {
-        0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-    },
-    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
-    {37, 38, 39, 40, 41, 42},
-    {43, 44},
-};
-
 Solution local_search(const Solution &sol20) {
   Solution best_found = sol20;
   bool improved;
@@ -1120,16 +1110,24 @@ Solution local_search(const Solution &sol20) {
     for (int i = 0; i < N; ++i) {
       misi mapping;
 
-      for (int c = 0; c < 45; ++c)
-        mapping[i].insert(c);
+      set<int> free_connections;
+      for (int j = 0; j < N; ++j)
+        free_connections.insert(j);
 
       for (const TimeSlot &ts : sol20.slots)
         for (const Channel &ch : ts.channels)
           for (const Connection &conn : ch.connections)
-            if (conn.id != i)
+            if (conn.id != i) {
               for (int o_c = 0; o_c < 45; ++o_c)
                 if (overlap[ch.ix][o_c])
                   mapping[conn.id].insert(o_c);
+
+              free_connections.erase(conn.id);
+            }
+
+      for (const int j : free_connections)
+        for (int c = 0; c < 45; ++c)
+          mapping[j].insert(c);
 
       Solution opt = vrbsp(mapping);
       if (opt > best_found) {
@@ -1149,6 +1147,16 @@ Solution local_search(const Solution &sol20) {
 
 #if defined(USE_VNS_MATH_SOLVER) || defined(USE_VRBSP_IP) ||                   \
     defined(USE_MDVRBSP_IP)
+
+vector<unordered_set<int>> C_b = {
+    {
+        0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    },
+    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
+    {37, 38, 39, 40, 41, 42},
+    {43, 44},
+};
 
 void couple(GRBModel *model, seila3 &y, seila2 &x) {
   for (const auto &[i, b_vars] : y)
@@ -1196,7 +1204,7 @@ void ch_overlap(GRBModel *model, seila2 &z, seila2 &x) {
 
         string name =
             "over" + to_string(i) + "," + to_string(c1) + "," + to_string(t);
-        model->addConstr(expr == z[t][i][c1], name);
+        model->addConstr(expr == z[i][c1][t], name);
       }
 }
 
@@ -1206,18 +1214,17 @@ void interch(GRBModel *model, seila2 &z, seila2 &Iij) {
       for (const auto &[t, _] : z[i][c]) {
 
         GRBLinExpr expr = 0;
-        for (const auto &[j, channels] : z) {
-          if (i == j)
+        for (const auto &[u, channels] : z) {
+          if (i == u)
             continue;
 
-          for (const auto &[c2, time_slots2] : z[j]) {
-            for (const auto &[t2, _] : z[j][c2]) {
+          for (const auto &[c2, time_slots2] : z[u])
+            for (const auto &[t2, _] : z[u][c2]) {
               if (t != t2)
                 continue;
 
-              expr += AFF[j][i] * z[j][c2][t2];
+              expr += AFF[u][i] * z[u][c2][t2];
             }
-          }
         }
 
         string name =
@@ -1276,8 +1283,12 @@ Solution vrbsp(misi &connections_channels) {
     for (const auto &[l, _] : connections_channels)
       links.push_back(l);
   else
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; ++i) {
       links.push_back(i);
+
+      for (int c = 0; c < 45; ++c)
+        connections_channels[i].insert(c);
+    }
 
   // variables
   // printf("variables...\n");
@@ -1291,15 +1302,47 @@ Solution vrbsp(misi &connections_channels) {
   // printf("constraints...\n");
   unique(model, x);
   couple(model, y, x);
-  // ch_overlap(model, z, x);
-  // interch(model, z, Iij);
-  // bigG(model, I, Iij, x);
-  // bigL(model, I, Iij, x);
-  // sinr(model, I, x);
+  ch_overlap(model, z, x);
+  interch(model, z, Iij);
+  bigG(model, I, Iij, x);
+  bigL(model, I, Iij, x);
+  sinr(model, I, x);
   //
-  // model->update();
-  // model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
+  model->update();
+  model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
+  model->write("model.lp");
+  model->optimize();
 
+  if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
+    assert(model->get(GRB_IntAttr_SolCount) != 0);
+
+    vector<map<int, vector<int>>> grb_sol(T);
+
+    for (const auto &[j, channels] : x)
+      for (const auto &[c, time_slots] : x[j])
+        for (const auto &[t, _] : x[j][c])
+          if (approximatelyEqual(x[j][c][t].get(GRB_DoubleAttr_X), 1.0))
+            grb_sol[t][c].push_back(j);
+
+    Solution ret;
+    for (const map<int, vector<int>> time_slot : grb_sol) {
+      TimeSlot ts;
+      for (const auto &[ch, connections] : time_slot) {
+        Channel channel(idxToB(ch), {});
+
+        for (const int j : connections)
+          channel.connections.push_back(Connection{j});
+
+        ts.channels.push_back(channel);
+      }
+
+      ret.slots.push_back(ts);
+    }
+
+    return ret;
+  }
+
+  assert(false);
   return Solution();
 };
 
@@ -1316,7 +1359,7 @@ void var_y(GRBModel *model, seila3 &y, misi &connection_channels) {
         for (int m = 0; m < 12; ++m) {
           string name = "y" + to_string(i) + "," + to_string(b) + "," +
                         to_string(m) + "," + to_string(t);
-          y[i][b][m][t] = model->addVar(0.0, 1.0, DR[b][m], GRB_BINARY, name);
+          y[i][b][m][t] = model->addVar(0.0, 1.0, DR[m][b], GRB_BINARY, name);
           cnt++;
         }
       }
@@ -1424,6 +1467,17 @@ int cToBIdx(int c) {
     return 2;
   else
     return 3;
+}
+
+int idxToB(int idx) {
+  if (idx == 0)
+    return 20;
+  else if (idx == 1)
+    return 40;
+  else if (idx == 2)
+    return 80;
+
+  return 160;
 }
 
 bool approximatelyEqual(double a, double b, double epsilon) {

@@ -47,6 +47,7 @@ extern double receivers[MAX_CONN][2], senders[MAX_CONN][2];
 extern double AFF[MAX_CONN][MAX_CONN];
 extern double DM[MAX_CONN][MAX_CONN];
 extern vector<vector<double>> DR, SINR, B;
+extern vector<unordered_set<int>> C_b;
 
 extern vector<double> GMM, BM;
 
@@ -231,6 +232,8 @@ bool canTransmitUsingChannel(int, int);
 bool canTransmitUsingBandwidth(int, int, int);
 
 int cToBIdx(int);
+
+int idxToB(int);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 void var_Iij(GRBModel *, seila2 &, misi &);
