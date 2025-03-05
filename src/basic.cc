@@ -288,7 +288,7 @@ optional<Channel> deleteFromChannel(Channel channel, int idConn) {
   channel.throughput = 0.0;
   channel.violation = 0.0;
   for (Connection &conn : channel.connections) {
-    conn.interference -= AFF[conn.id][idConn];
+    conn.interference -= AFF[idConn][conn.id];
 
     computeConnectionThroughput(conn, channel.bandwidth);
     channel.throughput += conn.throughput;
@@ -516,7 +516,8 @@ void read_data() {
     }
   }
 
-  BM.assign(N, 0.0);
+  // TODO: find a better value for this big-M
+  BM.assign(N, 100.0);
   B.assign(N, vector<double>(4, 0));
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; ++j) {
@@ -591,7 +592,7 @@ double computeThroughput(Solution &curr, bool force) {
         u.interference = 0.0;
         u.throughput = 0.0;
         for (Connection &v : ch.connections)
-          u.interference += u.id == v.id ? 0.0 : AFF[u.id][v.id];
+          u.interference += u.id == v.id ? 0.0 : AFF[v.id][u.id];
 
         ch.throughput += computeConnectionThroughput(u, ch.bandwidth);
       }
@@ -1055,7 +1056,6 @@ Solution local_search(const Solution &sol20) {
     best_found_before = best_multiple.throughput_;
 
     for (int i = 0; i < N; ++i) {
-      Channel ch_cp;
       dii best_of_i = {best_multiple.throughput_, {-2, -2}};
 
       Solution baseline = best_multiple;
@@ -1092,8 +1092,15 @@ Solution local_search(const Solution &sol20) {
 
   double aux = optimal_partitioning_global(best_multiple);
 
-  Solution ret = best_multiple.get_optimal_solution();
-  assert(approximatelyEqual(aux, ret.throughput_));
+  Solution ret{vector<TimeSlot>{TimeSlot()}};
+  ret.throughput_ = best_multiple.throughput_;
+  for (int t = 0; t < T; ++t)
+    for (int c = 0; c < 25; ++c)
+      ret(t).channels.push_back(best_multiple(t, c));
+
+  double old = best_multiple.throughput_;
+  optimal_partitioning_global(best_multiple);
+  assert(approximatelyEqual(best_multiple.throughput_, old));
 
   // printf("entered %.3lf and outputs %.3lf\n", start_of, ret.throughput_);
   return ret;
@@ -1219,12 +1226,9 @@ void interch(GRBModel *model, seila2 &z, seila2 &Iij) {
             continue;
 
           for (const auto &[c2, time_slots2] : z[u])
-            for (const auto &[t2, _] : z[u][c2]) {
-              if (t != t2)
-                continue;
-
-              expr += AFF[u][i] * z[u][c2][t2];
-            }
+            for (const auto &[t2, _] : z[u][c2])
+              if (t == t2 && overlap[c][c2])
+                expr += AFF[u][i] * z[u][c2][t2];
         }
 
         string name =
@@ -1256,13 +1260,14 @@ void bigL(GRBModel *model, mivar &I, seila2 &Iij, seila2 &x) {
   }
 }
 
-void sinr(GRBModel *model, mivar &I, seila2 &x) {
-  for (const auto &[i, var] : I) {
+void sinr(GRBModel *model, mivar &I, seila3 &y) {
+  for (const auto &[i, _] : I) {
     GRBLinExpr expr = 0;
 
-    for (const auto &[c, time_slots] : x[i]) {
-      for (const auto &[t, _] : x[i][c])
-        expr += (AFF[i][i] / B[i][cToBIdx(c)] - NOI) * x[i][c][t];
+    for (const auto &[b, mcss] : y[i]) {
+      for (const auto &[m, _] : y[i][b])
+        for (const auto &[t, _] : y[i][b][m])
+          expr += (AFF[i][i] / B[i][b] - NOI) * y[i][b][m][t];
     }
 
     string name = "sinr" + to_string(i);
@@ -1306,11 +1311,11 @@ Solution vrbsp(misi &connections_channels) {
   interch(model, z, Iij);
   bigG(model, I, Iij, x);
   bigL(model, I, Iij, x);
-  sinr(model, I, x);
+  sinr(model, I, y);
   //
   model->update();
   model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
-  model->write("model.lp");
+  // model->write("model.lp");
   model->optimize();
 
   if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {

@@ -8,10 +8,10 @@ inline double elapsed_time(hrc::time_point from) {
 }
 
 Solution vns() {
-  // progress_file = fopen("progress.csv", "w");
   auto start = high_resolution_clock::now();
   Solution inc = CH_VRBSP();
   printf("%.4lf,%.4lf\n", inc.throughput_, elapsed_time(start));
+
   Solution inc_20 = convertTo20MhzSol(inc);
 
   int K_MUL = max(1, N / 100);

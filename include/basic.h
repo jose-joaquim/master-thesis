@@ -252,15 +252,15 @@ void unique(GRBModel *, seila2 &);
 
 void couple(GRBModel *, seila3 &, seila2 &);
 
-void ch_overlap(GRBModel *, mt3 &, mt3 &);
+void ch_overlap(GRBModel *, seila2 &, seila2 &);
 
-void interch(GRBModel *, mt3 &, mt3 &);
+void interch(GRBModel *, seila2 &, seila2 &);
 
-void bigG(GRBModel *, mt2 &, mt3 &, mt3 &);
+void bigG(GRBModel *, mivar &, seila2 &, seila2 &);
 
-void bigL(GRBModel *, mt2 &, mt3 &, mt3 &);
+void bigL(GRBModel *, mivar &, seila2 &, seila2 &);
 
-void sinr(GRBModel *, mt2 &, mt3 &);
+void sinr(GRBModel *, mivar &, seila3 &);
 
 Solution vrbsp(misi &);
 #endif
