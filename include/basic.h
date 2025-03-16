@@ -1,6 +1,7 @@
 #ifndef MASTER_BASIC_H_
 #define MASTER_BASIC_H_
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -234,6 +235,8 @@ bool canTransmitUsingBandwidth(int, int, int);
 int cToBIdx(int);
 
 int idxToB(int);
+
+int ChannelIdToBandwidth(int);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 void var_Iij(GRBModel *, seila2 &, misi &);

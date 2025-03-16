@@ -1,7 +1,6 @@
 .DS_store
 .idea/
 **/results/
-**/bin/
 **/*.lp
 **/*.ilp
 **/*~

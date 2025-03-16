@@ -379,6 +379,55 @@ bool can_split(const Channel &ch) {
   return true;
 }
 
+#if defined(USE_DECODER)
+double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
+  // int totalSpectrum = 160 + 240 + 100, totalUsedSpectrum = 0.0;
+  //
+  // vector<Channel> auxCh;
+  // Spectrum spec1(160, 0, auxCh);
+  // Spectrum spec2(240, 0, auxCh);
+  // Spectrum spec3(100, 0, auxCh);
+  // Solution sol({spec1, spec2, spec3}, 0.0);
+  //
+  // // First, insert in free channels
+  // int idx = 0;
+  // while (idx < permutation.size() && totalUsedSpectrum < totalSpectrum) {
+  //     int connection = permutation[idx] / 2;
+  //     int bandWidth = convertChromoBandwidth(variables[permutation[idx] +
+  //     1]); totalUsedSpectrum += insertFreeChannel(sol, connection, bandWidth,
+  //     variables); idx++;
+  // }
+  //
+  // // Second, insert in the best channels
+  // while (idx < permutation.size()) {
+  //     int connection = permutation[idx] / 2;
+  //     int bandWidth = convertChromoBandwidth(variables[permutation[idx] +
+  //     1]); insertBestChannel(sol, connection, bandWidth, variables); idx++;
+  // }
+  //
+  // double throughput = sol.throughput;
+  // return -1.0 * throughput;
+  return 0.0;
+}
+
+double Solution::decode(std::vector<double> variables) const {
+  double fitness = 0.0;
+
+  vector<pair<double, int>> ranking;
+  for (int i = 0; i < variables.size(); i += 2)
+    ranking.emplace_back(variables[i], i);
+
+  sort(ranking.begin(), ranking.end());
+
+  vector<int> permutation;
+  for (int i = 0; i < ranking.size(); i++)
+    permutation.emplace_back(ranking[i].second);
+
+  // fitness = buildVRBSPSolution(variables, permutation);
+  return fitness;
+}
+#endif
+
 #if defined(USE_MDVRBSP_IP)
 Solution CH_MDVRBSP() {
   // TODO: need to fix because I included timeslots
@@ -1260,6 +1309,42 @@ void bigL(GRBModel *model, mivar &I, seila2 &Iij, seila2 &x) {
   }
 }
 
+void interference(GRBModel *model, mivar &I, seila2 &x) {
+  try {
+    for (const auto &[i, _] : I) {
+      GRBQuadExpr expr = 0;
+
+      for (const auto &[j, _] : I) {
+        if (i == j)
+          continue;
+
+        for (const auto &[c, _] : x[i]) {
+          for (const auto &[t1, _] : x[i][c]) {
+
+            for (const auto &[c2, _] : x[j]) {
+              if (!overlap[c][c2])
+                continue;
+
+              for (const auto &[t2, _] : x[j][c2]) {
+                if (t1 != t2)
+                  continue;
+
+                expr += AFF[j][i] * (x[i][c][t1] * x[j][c2][t1]);
+              }
+            }
+          }
+        }
+      }
+
+      string name = "interference" + to_string(i);
+      model->addQConstr(I[i] == expr, name);
+    }
+  } catch (GRBException e) {
+    cout << e.getErrorCode() << endl;
+    exit(10);
+  }
+}
+
 void sinr(GRBModel *model, mivar &I, seila3 &y) {
   for (const auto &[i, _] : I) {
     GRBLinExpr expr = 0;
@@ -1267,11 +1352,34 @@ void sinr(GRBModel *model, mivar &I, seila3 &y) {
     for (const auto &[b, mcss] : y[i]) {
       for (const auto &[m, _] : y[i][b])
         for (const auto &[t, _] : y[i][b][m])
-          expr += (AFF[i][i] / B[i][b] - NOI) * y[i][b][m][t];
+          expr += (AFF[i][i] / SINR[m][b] - NOI) * y[i][b][m][t];
     }
 
     string name = "sinr" + to_string(i);
     model->addConstr(I[i] <= expr, name);
+  }
+}
+
+void seila_constr(GRBModel *model, seila2 &x) {
+  for (const auto &[i, channels] : x) {
+    vector<vector<pair<int, GRBVar>>> vars_per_ts(T,
+                                                  vector<pair<int, GRBVar>>());
+
+    for (const auto &[c, ts] : x[i])
+      for (const auto &[t, _] : x[i][c])
+        vars_per_ts[t].push_back({c, x[i][c][t]});
+
+    for (int t = 0; t < T; ++t) {
+      sort(vars_per_ts[t].rbegin(), vars_per_ts[t].rend(),
+           [](pair<int, GRBVar> a, pair<int, GRBVar> b) {
+             return a.first < b.first;
+           });
+
+      for (int u = 0; u < vars_per_ts[t].size(); ++u)
+        for (int k = u + 1; k < vars_per_ts[t].size(); ++k)
+          model->addConstr(vars_per_ts[t][k].second <=
+                           1 - vars_per_ts[t][u].second);
+    }
   }
 }
 
@@ -1307,19 +1415,22 @@ Solution vrbsp(misi &connections_channels) {
   // printf("constraints...\n");
   unique(model, x);
   couple(model, y, x);
-  ch_overlap(model, z, x);
-  interch(model, z, Iij);
-  bigG(model, I, Iij, x);
-  bigL(model, I, Iij, x);
+  interference(model, I, x);
+  // ch_overlap(model, z, x);
+  // interch(model, z, Iij);
+  // bigG(model, I, Iij, x);
+  // bigL(model, I, Iij, x);
   sinr(model, I, y);
+  seila_constr(model, x);
   //
   model->update();
   model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
-  // model->write("model.lp");
+  model->write("model.lp");
   model->optimize();
 
   if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
     assert(model->get(GRB_IntAttr_SolCount) != 0);
+    model->write("sol.sol");
 
     vector<map<int, vector<int>>> grb_sol(T);
 
@@ -1333,7 +1444,7 @@ Solution vrbsp(misi &connections_channels) {
     for (const map<int, vector<int>> time_slot : grb_sol) {
       TimeSlot ts;
       for (const auto &[ch, connections] : time_slot) {
-        Channel channel(idxToB(ch), {});
+        Channel channel(ChannelIdToBandwidth(ch), {});
 
         for (const int j : connections)
           channel.connections.push_back(Connection{j});
@@ -1344,6 +1455,7 @@ Solution vrbsp(misi &connections_channels) {
       ret.slots.push_back(ts);
     }
 
+    computeThroughput(ret);
     return ret;
   }
 
@@ -1483,6 +1595,17 @@ int idxToB(int idx) {
     return 80;
 
   return 160;
+}
+
+int ChannelIdToBandwidth(int c) {
+  if (c <= 24)
+    return 20;
+  else if (c <= 36)
+    return 40;
+  else if (c <= 42)
+    return 80;
+  else
+    return 160;
 }
 
 bool approximatelyEqual(double a, double b, double epsilon) {

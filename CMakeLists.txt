@@ -6,14 +6,12 @@ option(USE_VNS_PURE "VNS with DP in Local Search" OFF)
 option(USE_VRBSP_IP "VRBSP integer program" OFF)
 option(USE_MDVRBSP_IP "MDVRBSP integer program" OFF)
 option(USE_MVRBSP_COL_GEN "MDVRBSP with column geneneration" OFF)
-option(USE_DECODER "VRBSP with brkga" OFF)
 
 if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_VNS_PURE
    AND NOT USE_VRBSP_IP
    AND NOT USE_MDVRBSP_IP
    AND NOT USE_MRVRBSP_COL_GEN
-   AND NOT USE_DECODER)
   message(FATAL_ERROR "You need to select an option!")
 endif()
 
@@ -49,9 +47,7 @@ endif()
 
 if(USE_VNS_MATH_SOLVER)
   target_compile_definitions(basic PUBLIC USE_VNS_MATH_SOLVER)
-  find_package(GUROBI REQUIRED)
   add_executable(vns_math_solver "./src/vns.cc")
-
   target_link_libraries(vns_math_solver basic)
 elseif(USE_VNS_PURE)
   target_compile_definitions(basic PUBLIC USE_VNS_PURE)
@@ -66,7 +62,5 @@ elseif(USE_MDVRBSP_IP)
   add_executable(mdvrbsp_ip "./src/mdvrbsp.cc")
   target_link_libraries(mdvrbsp_ip basic)
 elseif(USE_MDVRBSP_COL_GEN)
-
-elseif(USE_DECODER)
 
 endif()
