@@ -364,17 +364,17 @@ int convertChromoBandwidth(double value) {
 //     for (auto &slot : sol.slots) {
 //         for (auto &spec : slot.spectrums) {
 //             int free = spec.maxFrequency - spec.usedFrequency;
-// 
+//
 //             if (free >= bw) {
 //                 spec.usedFrequency += bw;
-// 
+//
 //                 auto ch = insertInChannel(Channel(bw), conn);
 //                 sol.throughput += ch.throughput;
 //                 return true;
 //             }
 //         }
 //     }
-// 
+//
 //     return false;
 // }
 
@@ -609,39 +609,39 @@ double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
 
 // double buildVRBSPSolution(vector<double> vars, vector<int> perm) {
 //     int totSpec = 500, totUsed = 0;
-// 
+//
 //     vector<Channel> auxCh;
 //     Spectrum spec1(160, 0, auxCh);
 //     Spectrum spec2(240, 0, auxCh);
 //     Spectrum spec3(100, 0, auxCh);
 //     Solution sol({spec1, spec2, spec3}, 0.0);
-// 
+//
 //     vector<int> leftOut;
-// 
+//
 //     for (int i = 0; i < int(perm.size()) && totUsed < totSpec; ++i) {
 //         int conn = perm[i] / 2;
 //         int bw = convertChromoBandwidth(vars[perm[i] + 1]);
-// 
+//
 //         if (!insertFreeChannel(sol, conn, bw, vars, totUsed))
 //             leftOut.emplace_back(perm[i]);
 //     }
-// 
+//
 //     vector<int> leftOutAgain;
 //     if (totUsed < totSpec) {
 //         for (int i = 0; i < int(leftOut.size()) && totUsed < totSpec; ++i) {
 //             int conn = leftOut[i] / 2;
 //             int bw = convertChromoBandwidth(vars[leftOut[i] + 1]);
-// 
+//
 //             if (!insertBestFreeChannel(sol, conn, bw, vars, totUsed))
 //                 leftOutAgain.emplace_back(leftOut[i]);
 //         }
 //     } else
 //         leftOutAgain = leftOut;
-// 
+//
 //     for (int i = 0; i < int(leftOutAgain.size()); ++i) {
 //         int conn = leftOutAgain[i] / 2;
 //         int bw = convertChromoBandwidth(vars[leftOut[i] + 1]);
-// 
+//
 //         insertRemainingChannels(sol, conn, bw, vars);
 //     }
 //     return -1.0 * sol.throughput;
