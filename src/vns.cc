@@ -16,10 +16,10 @@ Solution vns() {
 
   int K_MUL = max(1, N / 100);
   int K_MAX = N;
-  while (!stop(start, 60)) {
+  while (!stop(start, 300)) {
     int k = 1;
     Solution candidate = inc_20;
-    while (!stop(start, 60) && k <= K_MAX) {
+    while (!stop(start, 300) && k <= K_MAX) {
       candidate = perturbation(candidate, k * K_MUL);
       candidate = local_search(candidate);
 

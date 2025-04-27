@@ -123,6 +123,7 @@ public:
   void get_optimal_solution(Solution &, int, int, bool);
 
   vector<Connection> get_scheduled_connections() const;
+  double decode(std::vector<double>) const;
 
   bool operator<(const Solution &) const;
   bool operator>(const Solution &) const;

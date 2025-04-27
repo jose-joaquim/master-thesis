@@ -393,48 +393,42 @@ int convertChromoBandwidth(double value) {
 
 int insertFreeChannel(Solution &sol, int conn, int band,
                       vector<double> &variables) {
-  int freeSpec = 0, freeSpec2 = 0, idxSpectrum = -1, idxSlot = -1;
-  int auxBw = -1;
-  bool inserted = false;
-  for (int t = 0; t < int(sol.slots.size()); t++) {
-    for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
-      freeSpec = sol.slots[t].spectrums[s].maxFrequency -
-                 sol.slots[t].spectrums[s].usedFrequency;
 
-      if (freeSpec >= band) {
-        sol.slots[t].spectrums[s].usedFrequency += band;
+  int best_ts = -1;
+  int alternative_bw = -1;
+  int largest_free_bw = 0;
+  for (int ts_ix = 0; TimeSlot & ts : sol.slots) {
+    int free_bw = 500 - ts.used_bw;
+    if (free_bw >= band) {
+      Channel newChannel = Channel(band, {});
+      newChannel = *insertInChannel(newChannel, conn, true);
+      ts(ts_ix).emplace_back(newChannel);
 
-        Channel newChannel = Channel(band, {});
-        newChannel = *insertInChannel(newChannel, conn, true);
-        sol.slots[t].spectrums[s].channels.emplace_back(newChannel);
+      sol.throughput_ += newChannel.throughput;
+      return band;
+    } else if (free_bw >= largest_free_bw) {
+      best_ts = ts_ix;
+      largest_free_bw = best_ts;
 
-        sol.throughput_ += newChannel.throughput;
-        inserted = true;
-        return band;
-      } else if (freeSpec > freeSpec2) { // TODO: what is the condition?
-        freeSpec2 = freeSpec;
-        idxSpectrum = s;
-        idxSlot = t;
-
-        if (freeSpec2 >= 80) {
-          auxBw = 80;
-        } else if (freeSpec2 >= 40) {
-          auxBw = 40;
-        } else {
-          auxBw = 20;
-        }
-      }
+      if (largest_free_bw >= 80)
+        alternative_bw = 80;
+      else if (largest_free_bw >= 40)
+        alternative_bw = 40;
+      else if (largest_free_bw >= 20)
+        alternative_bw = 20;
     }
+
+    ts_ix += 1;
   }
 
-  assert(auxBw != -1);
-  if (!inserted && freeSpec2 > 0) {
-    Channel newChannel = insertInChannel(Channel(auxBw), conn);
-    sol.slots[idxSlot].spectrums[idxSpectrum].usedFrequency += auxBw;
-    sol.slots[idxSlot].spectrums[idxSpectrum].channels.emplace_back(newChannel);
+  assert(alternative_bw != -1);
+  if (alternative_bw > 0) {
+    Channel newChannel(alternative_bw, {});
+    insertInChannel(Channel(alternative_bw, {}), conn);
+    sol(best_ts).channels.emplace_back(newChannel);
     sol.throughput_ += newChannel.throughput;
 
-    if (auxBw != band) {
+    if (alternative_bw != band) {
       switch (newChannel.bandwidth) {
       case 20:
         variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
@@ -454,64 +448,64 @@ int insertFreeChannel(Solution &sol, int conn, int band,
     }
   }
 
-  return auxBw;
+  return alternative_bw;
 }
 
 void insertBestChannel(Solution &sol, int conn, int band,
                        vector<double> &variables) {
   // TODO: remind to check the output of this function.
-  double currentThroughput = sol.throughput_,
-         bestThroughputIteration = sol.throughput_;
-  bool inserted = false;
-  Channel newChannel(band);
-  tuple<int, int, int> nCh = {-1, -1, -1};
-  for (int t = 0; t < int(sol.slots.size()); t++) {
-    for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
-      for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
-        Channel channelInsert =
-            insertInChannel(sol.slots[t].spectrums[s].channels[c], conn);
-
-        double auxThroughput =
-            currentThroughput -
-            sol.slots[t].spectrums[s].channels[c].throughput +
-            channelInsert.throughput;
-
-        if (auxThroughput > bestThroughputIteration) {
-          bestThroughputIteration = auxThroughput;
-          newChannel = channelInsert;
-          inserted = true;
-          nCh = {t, s, c};
-        }
-      }
-    }
-  }
-
-  if (inserted) {
-    const auto &[ts, sp, ch] = nCh;
-    sol.throughput_ = sol.throughput_ -
-                      sol.slots[ts].spectrums[sp].channels[ch].throughput +
-                      newChannel.throughput;
-    sol.slots[ts].spectrums[sp].channels[get<2>(nCh)] = newChannel;
-
-    if (newChannel.bandwidth != band) {
-      switch (newChannel.bandwidth) {
-      case 20:
-        variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
-        break;
-      case 40:
-        variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
-        break;
-      case 80:
-        variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
-        break;
-      case 160:
-        variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
-        break;
-      default:
-        exit(77);
-      }
-    }
-  }
+  // double currentThroughput = sol.throughput_,
+  //        bestThroughputIteration = sol.throughput_;
+  // bool inserted = false;
+  // Channel newChannel(band);
+  // tuple<int, int, int> nCh = {-1, -1, -1};
+  // for (int t = 0; t < int(sol.slots.size()); t++) {
+  //   for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
+  //     for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
+  //       Channel channelInsert =
+  //           insertInChannel(sol.slots[t].spectrums[s].channels[c], conn);
+  //
+  //       double auxThroughput =
+  //           currentThroughput -
+  //           sol.slots[t].spectrums[s].channels[c].throughput +
+  //           channelInsert.throughput;
+  //
+  //       if (auxThroughput > bestThroughputIteration) {
+  //         bestThroughputIteration = auxThroughput;
+  //         newChannel = channelInsert;
+  //         inserted = true;
+  //         nCh = {t, s, c};
+  //       }
+  //     }
+  //   }
+  // }
+  //
+  // if (inserted) {
+  //   const auto &[ts, sp, ch] = nCh;
+  //   sol.throughput_ = sol.throughput_ -
+  //                     sol.slots[ts].spectrums[sp].channels[ch].throughput +
+  //                     newChannel.throughput;
+  //   sol.slots[ts].spectrums[sp].channels[get<2>(nCh)] = newChannel;
+  //
+  //   if (newChannel.bandwidth != band) {
+  //     switch (newChannel.bandwidth) {
+  //     case 20:
+  //       variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
+  //       break;
+  //     case 40:
+  //       variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
+  //       break;
+  //     case 80:
+  //       variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
+  //       break;
+  //     case 160:
+  //       variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
+  //       break;
+  //     default:
+  //       exit(77);
+  //     }
+  //   }
+  // }
 }
 
 double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
