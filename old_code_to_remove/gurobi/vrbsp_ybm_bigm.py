@@ -45,7 +45,7 @@ def defineModel(N, B, NC, MCS, OVER, DR, NS, AFF, SINR, BM):
     m = gp.Model("vrbsp ybm bigm")
 
     def variables():
-        x = m.addVars(N, NC, vtype=GRB.BINARY, name="x")
+        x = m.addVars(N, NC, vtype=GRB.BINARY, name="x", ub=0)
         y = m.addVars(N, B, MCS, vtype=GRB.BINARY, name="y")
         z = m.addVars(N, NC, vtype=GRB.BINARY, name="z")
         I_ = m.addVars(N, lb=0.0, vtype=GRB.CONTINUOUS, name="I")
@@ -56,8 +56,7 @@ def defineModel(N, B, NC, MCS, OVER, DR, NS, AFF, SINR, BM):
     def constraints(x, y, z, I_, Iij):
         # Constraint 1
         m.addConstrs(
-            (gp.quicksum(x[i, c] for c in range(NC)) <= 1.0 for i in range(N)),
-            "unique"
+            (gp.quicksum(x[i, c] for c in range(NC)) <= 1.0 for i in range(N)), "unique"
         )
 
         # Constraint 2

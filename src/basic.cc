@@ -2,7 +2,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <string>
+#include <type_traits>
 
 #if defined(USE_MATH_SOLVER)
 #include "gurobi_c++.h"
@@ -12,7 +14,7 @@ using mt3 = map<tuple<int, int, int>, GRBVar>;
 
 FILE *progress_file;
 
-int N, T;
+int N, T, cnt;
 double alfa, NOI, powerSender;
 double receivers[MAX_CONN][2], senders[MAX_CONN][2];
 double AFF[MAX_CONN][MAX_CONN];
@@ -166,11 +168,17 @@ Connection &Channel::operator()(int l) { return connections[l]; }
 TimeSlot::TimeSlot() {
   interference = 0.0;
   throughput = 0.0;
+  ub_channels = {{160, 0}, {80, 0}, {40, 0}, {20, 0}};
 }
 
 TimeSlot::TimeSlot(const vector<Channel> &chs) : channels(chs) {
   interference = 0.0;
   throughput = 0.0;
+
+  ub_channels = {{160, 0}, {80, 0}, {40, 0}, {20, 0}};
+
+  for (const Channel &ch : channels)
+    ub_channels[ch.bandwidth] += 1;
 }
 
 Channel &TimeSlot::operator()(int c) { return channels[c]; }
@@ -187,6 +195,22 @@ vector<Connection> Solution::get_scheduled_connections() const {
         ret.push_back(conn);
 
   return ret;
+}
+
+void to_json(json &json, const Solution &sol) {
+  vector<pair<int, vector<int>>> channels;
+
+  for (const Channel &ch : sol.slots[0].channels) {
+    vector<int> conns;
+    for (const Connection &conn : ch.connections)
+      if (definitelyGreaterThan(conn.throughput, 0.0))
+        conns.push_back(conn.id);
+
+    channels.push_back({ch.bandwidth, conns});
+  }
+
+  json["throughput"] = sol.throughput_;
+  json["channels"] = channels;
 }
 
 Solution::Solution(const vector<TimeSlot> &ts) : slots(ts) {
@@ -267,7 +291,7 @@ double computeConnectionThroughput(Connection &i, int bw) {
       mcs--;
 
     if (mcs < 0) {
-      return -1;
+      i.throughput = 0.0;
     } else
       i.throughput = DR[mcs][bToIdx(bw)];
   }
@@ -298,21 +322,21 @@ optional<Channel> deleteFromChannel(Channel channel, int idConn) {
 }
 
 optional<Channel> insertInChannel(Channel new_c, int i_idx, bool force) {
-  Connection i(i_idx, 0.0, 0.0, DM[i_idx][i_idx]);
+  Connection new_conn(i_idx, 0.0, 0.0, DM[i_idx][i_idx]);
 
   for (auto &j : new_c.connections) {
     j.interference += AFF[i_idx][j.id];
-    i.interference += AFF[j.id][i_idx];
+    new_conn.interference += AFF[j.id][i_idx];
   }
 
   new_c.throughput = 0.0;
-  new_c.connections.emplace_back(i);
-  for (auto &i : new_c.connections) {
-    double ans = computeConnectionThroughput(i, new_c.bandwidth);
-    if (!force && !SINRfeas(i, new_c.bandwidth))
+  new_c.connections.emplace_back(new_conn);
+  for (auto &connection : new_c.connections) {
+    double ans = computeConnectionThroughput(connection, new_c.bandwidth);
+    if (!force && !SINRfeas(connection, new_c.bandwidth))
       return nullopt;
 
-    new_c.throughput += i.throughput;
+    new_c.throughput += connection.throughput;
   }
 
   return new_c;
@@ -391,60 +415,60 @@ int convertChromoBandwidth(double value) {
   return 160;
 }
 
+unordered_map<int, int> ub_channels = {{160, 2}, {80, 6}, {40, 12}, {20, 25}};
+
 int insertFreeChannel(Solution &sol, int conn, int band,
                       vector<double> &variables) {
-
-  int best_ts = -1;
   int alternative_bw = -1;
   int largest_free_bw = 0;
-  for (int ts_ix = 0; TimeSlot & ts : sol.slots) {
+  for (TimeSlot &ts : sol.slots) {
     int free_bw = 500 - ts.used_bw;
-    if (free_bw >= band) {
+    if (free_bw >= band && sol(0).ub_channels[band] + 1 < ub_channels[band]) {
       Channel newChannel = Channel(band, {});
       newChannel = *insertInChannel(newChannel, conn, true);
-      ts(ts_ix).emplace_back(newChannel);
+      ts.channels.emplace_back(newChannel);
+      ts.used_bw += band;
 
+      sol(0).ub_channels[band] += 1;
       sol.throughput_ += newChannel.throughput;
       return band;
     } else if (free_bw >= largest_free_bw) {
-      best_ts = ts_ix;
-      largest_free_bw = best_ts;
+      largest_free_bw = free_bw;
 
-      if (largest_free_bw >= 80)
+      if (largest_free_bw >= 80 &&
+          sol(0).ub_channels[band] + 1 < ub_channels[80])
         alternative_bw = 80;
-      else if (largest_free_bw >= 40)
+      else if (largest_free_bw >= 40 &&
+               sol(0).ub_channels[band] + 1 < ub_channels[40])
         alternative_bw = 40;
-      else if (largest_free_bw >= 20)
+      else if (largest_free_bw >= 20 &&
+               sol(0).ub_channels[band] + 1 < ub_channels[20])
         alternative_bw = 20;
     }
-
-    ts_ix += 1;
   }
 
-  assert(alternative_bw != -1);
-  if (alternative_bw > 0) {
-    Channel newChannel(alternative_bw, {});
-    insertInChannel(Channel(alternative_bw, {}), conn);
-    sol(best_ts).channels.emplace_back(newChannel);
-    sol.throughput_ += newChannel.throughput;
+  assert(alternative_bw > 0);
+  sol(0).channels.emplace_back(Channel(alternative_bw, {conn}));
+  sol(0).used_bw += alternative_bw;
+  sol(0).ub_channels[alternative_bw] += 1;
+  computeThroughput(sol);
 
-    if (alternative_bw != band) {
-      switch (newChannel.bandwidth) {
-      case 20:
-        variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
-        break;
-      case 40:
-        variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
-        break;
-      case 80:
-        variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
-        break;
-      case 160:
-        variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
-        break;
-      default:
-        exit(77);
-      }
+  if (alternative_bw != band) {
+    switch (alternative_bw) {
+    case 20:
+      variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
+      break;
+    case 40:
+      variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
+      break;
+    case 80:
+      variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
+      break;
+    case 160:
+      variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
+      break;
+    default:
+      exit(77);
     }
   }
 
@@ -453,92 +477,107 @@ int insertFreeChannel(Solution &sol, int conn, int band,
 
 void insertBestChannel(Solution &sol, int conn, int band,
                        vector<double> &variables) {
-  // TODO: remind to check the output of this function.
-  // double currentThroughput = sol.throughput_,
-  //        bestThroughputIteration = sol.throughput_;
-  // bool inserted = false;
-  // Channel newChannel(band);
-  // tuple<int, int, int> nCh = {-1, -1, -1};
-  // for (int t = 0; t < int(sol.slots.size()); t++) {
-  //   for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
-  //     for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
-  //       Channel channelInsert =
-  //           insertInChannel(sol.slots[t].spectrums[s].channels[c], conn);
-  //
-  //       double auxThroughput =
-  //           currentThroughput -
-  //           sol.slots[t].spectrums[s].channels[c].throughput +
-  //           channelInsert.throughput;
-  //
-  //       if (auxThroughput > bestThroughputIteration) {
-  //         bestThroughputIteration = auxThroughput;
-  //         newChannel = channelInsert;
-  //         inserted = true;
-  //         nCh = {t, s, c};
-  //       }
-  //     }
-  //   }
-  // }
-  //
-  // if (inserted) {
-  //   const auto &[ts, sp, ch] = nCh;
-  //   sol.throughput_ = sol.throughput_ -
-  //                     sol.slots[ts].spectrums[sp].channels[ch].throughput +
-  //                     newChannel.throughput;
-  //   sol.slots[ts].spectrums[sp].channels[get<2>(nCh)] = newChannel;
-  //
-  //   if (newChannel.bandwidth != band) {
-  //     switch (newChannel.bandwidth) {
-  //     case 20:
-  //       variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
-  //       break;
-  //     case 40:
-  //       variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
-  //       break;
-  //     case 80:
-  //       variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
-  //       break;
-  //     case 160:
-  //       variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
-  //       break;
-  //     default:
-  //       exit(77);
-  //     }
-  //   }
-  // }
+  pair<int, int> nCh = {-1, -1};
+  double max_throughput = sol.throughput_;
+  Channel seilaaaa;
+  for (int t = 0; t < int(sol.slots.size()); t++) {
+    for (int c = 0; c < sol(t).channels.size(); c++) {
+      Channel tmp_channel = *insertInChannel(sol(t, c), conn, true);
+      double update_throughput =
+          sol.throughput_ - sol(t, c).throughput + tmp_channel.throughput;
+
+      if (definitelyGreaterThan(update_throughput, max_throughput)) {
+        max_throughput = update_throughput;
+        seilaaaa = tmp_channel;
+        nCh = {t, c};
+      }
+    }
+  }
+
+  if (nCh == make_pair(-1, -1))
+    return;
+
+  const auto &[ts, ch] = nCh;
+  sol(ts, ch) = seilaaaa;
+  sol.throughput_ = max_throughput;
+
+  if (seilaaaa.bandwidth != band) {
+    switch (seilaaaa.bandwidth) {
+    case 20:
+      variables[(conn * 2) + 1] = (0 + 0.25) / 2.0;
+      break;
+    case 40:
+      variables[(conn * 2) + 1] = (0.5 + 0.25) / 2.0;
+      break;
+    case 80:
+      variables[(conn * 2) + 1] = (0.75 + 0.5) / 2.0;
+      break;
+    case 160:
+      variables[(conn * 2) + 1] = (1.0 + 0.75) / 2.0;
+      break;
+    default:
+      exit(77);
+    }
+  }
 }
 
-double buildVRBSPSolution(vector<double> variables, vector<int> permutation) {
-  int totalSpectrum = 160 + 240 + 100, totalUsedSpectrum = 0.0;
+double buildVRBSPSolution(vector<double> variables, vector<int> permutation,
+                          optional<string> out_file) {
+  // printf("start\n");
+  int totalSpectrum = 500, used_bw = 0;
 
-  Channel c160(160, {}), c80(80, {}), c40(40, {}), c20(20, {});
-  TimeSlot init(vector<Channel>{c160, c160, c80, c80, c20});
+  // Channel c160(160, {}), c80(80, {}), c40(40, {}), c20(20, {});
+  TimeSlot init(vector<Channel>{});
+  init.used_bw = 0.0;
   Solution sol(vector<TimeSlot>{init});
 
   // First, insert in free channels
   int idx = 0;
-  while (idx < permutation.size() && totalUsedSpectrum < totalSpectrum) {
+  while (idx < permutation.size() && used_bw < totalSpectrum) {
     int connection = permutation[idx] / 2;
     int bandWidth = convertChromoBandwidth(variables[permutation[idx] + 1]);
-    totalUsedSpectrum +=
-        insertFreeChannel(sol, connection, bandWidth, variables);
-    idx++;
+    used_bw += insertFreeChannel(sol, connection, bandWidth, variables);
+    idx += 1;
   }
+
+  computeThroughput(sol);
 
   // Second, insert in the best channels
   while (idx < permutation.size()) {
     int connection = permutation[idx] / 2;
     int bandWidth = convertChromoBandwidth(variables[permutation[idx] + 1]);
     insertBestChannel(sol, connection, bandWidth, variables);
-    idx++;
+    idx += 1;
+  }
+
+  int cnt_160 = 0, cnt_80 = 0, cnt_40 = 0, cnt_20 = 0;
+
+  for (const Channel &ch : sol(0).channels)
+    if (ch.bandwidth == 160)
+      cnt_160++;
+    else if (ch.bandwidth == 80)
+      cnt_80++;
+    else if (ch.bandwidth == 40)
+      cnt_40++;
+    else
+      cnt_20++;
+
+  assert(cnt_160 <= 2);
+  assert(cnt_80 <= 6);
+  assert(cnt_40 <= 12);
+  assert(cnt_20 <= 25);
+
+  if (out_file.has_value()) {
+    std::ofstream o(*out_file);
+    json seila = json(sol);
+    o << seila.dump(4);
+    o.close();
   }
 
   return -1.0 * sol.throughput_;
 }
 
 double Solution::decode(std::vector<double> variables) const {
-  double fitness = 0.0;
-
   vector<pair<double, int>> ranking;
   for (int i = 0; i < variables.size(); i += 2)
     ranking.emplace_back(variables[i], i);
@@ -549,7 +588,7 @@ double Solution::decode(std::vector<double> variables) const {
   for (int i = 0; i < ranking.size(); i++)
     permutation.emplace_back(ranking[i].second);
 
-  // fitness = buildVRBSPSolution(variables, permutation);
+  double fitness = buildVRBSPSolution(variables, permutation);
   return fitness;
 }
 #endif
@@ -979,7 +1018,7 @@ optional<vector<Channel>> split2(Channel toSplit,
     int it_best = -1;
 
     for (int c = 0; c < ret.size(); ++c) {
-      Channel ans = *insertInChannel(ret[c], con.id);
+      Channel ans = *insertInChannel(ret[c], con.id, true);
 
       if (definitelyGreaterThan(ans.throughput, best.throughput)) {
         best = ans;
@@ -1019,7 +1058,7 @@ Solution CH_VRBSP() {
 
     for (int c = 0; c < ret(0).channels.size(); ++c) {
       vector<Solution *> candidates{&tmp};
-      optional<Channel> c1 = *insertInChannel(ret(0, c), links[i]);
+      optional<Channel> c1 = *insertInChannel(ret(0, c), links[i], true);
 
       Solution s1 = ret, s2 = ret, s3 = ret;
       if (c1.has_value()) {
@@ -1031,8 +1070,8 @@ Solution CH_VRBSP() {
 
       if (opt_channels.has_value()) {
         vector<Channel> &channels = *opt_channels;
-        Channel c2 = *insertInChannel(channels[0], links[i]);
-        Channel c3 = *insertInChannel(channels[1], links[i]);
+        Channel c2 = *insertInChannel(channels[0], links[i], true);
+        Channel c3 = *insertInChannel(channels[1], links[i], true);
 
         s2(0, c) = c2;
         s2(0).channels.emplace_back(channels[1]);
@@ -1189,11 +1228,6 @@ double optimal_partitioning_global(Solution &multiple) {
   return multiple.throughput_;
 }
 
-double optimal_partitioning_global_reduced(Solution &multiple, int t, int ch) {
-  computeThroughput(multiple);
-  return calcDP(multiple, t, ch);
-}
-
 int insert_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
   double highest = -1;
   do {
@@ -1204,6 +1238,7 @@ int insert_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
       highest = channel;
 
   } while (channel != -1);
+
   return highest;
 }
 

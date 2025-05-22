@@ -1,23 +1,10 @@
 #! /bin/bash
 
 make brkga
-path_results="../results/brkga/vrbsp/U_"
 
-max_time=10
-
-lower=1
-upper=1
-for ((v=lower;v<=upper;v++));
-do
-    for inst in 64;
-    do
-        path_results_final=${path_results}${inst};
-        echo $path_results_final
-        mkdir -p ${path_results_final}
-        echo "./decoder_brkga ${inst} ${v} ${path_results_final} ${max_time}"
-        ./bin/decoder_brkga ${inst} ${v} ${path_results_final} ${max_time}
-
-        # sol_file="solution.txt"
-        # ./check ${inst} ${v} ${sol_file}
-    done;
-done;
+for inst in 64 128 512 1024 256 32 16 8; do
+	for v in 25 7 28 19 1 5 29 15 21 30 14 9 16 23 24 11; do
+		./bin/decoder_brkga ../../instances/dr/U_${inst}/MD-VRBSP_U_${inst}_${v}.txt
+	done
+	echo "done ${inst}"
+done

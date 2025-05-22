@@ -21,6 +21,11 @@ if(CXX)
   enable_language(CXX)
 endif()
 
+include(FetchContent)
+
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -32,7 +37,6 @@ set(CMAKE_CXX_STANDARD 20)
 add_library(basic STATIC "./src/basic.cc")
 
 include_directories("./include")
-# target_include_directories(basic PUBLIC "./include")
 
 if(USE_VNS_MATH_SOLVER
    OR USE_VRBSP_IP
@@ -43,6 +47,8 @@ if(USE_VNS_MATH_SOLVER
   find_package(GUROBI REQUIRED)
   target_include_directories(basic PUBLIC "${GUROBI_INCLUDE_DIRS}")
   target_link_libraries(basic ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
+else()
+  target_link_libraries(basic nlohmann_json::nlohmann_json)
 endif()
 
 if(USE_VNS_MATH_SOLVER)
@@ -52,7 +58,7 @@ if(USE_VNS_MATH_SOLVER)
 elseif(USE_VNS_PURE)
   target_compile_definitions(basic PUBLIC USE_VNS_PURE)
   add_executable(vns_pure "./src/vns.cc")
-  target_link_libraries(vns_pure basic)
+  target_link_libraries(vns_pure basic nlohmann_json::nlohmann_json)
 elseif(USE_VRBSP_IP)
   target_compile_definitions(basic PUBLIC USE_VRBSP_IP)
   add_executable(vrbsp_ip "./src/vrbsp.cc")

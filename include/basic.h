@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdio>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <random>
 #include <set>
 #include <tuple>
@@ -20,6 +21,7 @@ const double EPS = 1e-6;
 
 using namespace std;
 using namespace std::chrono;
+using json = nlohmann::json;
 using hrc = std::chrono::high_resolution_clock;
 using dii = pair<double, pair<int, int>>;
 using misi = map<int, unordered_set<int>>;
@@ -96,6 +98,8 @@ struct TimeSlot {
   vector<Channel> channels;
   double interference;
   double throughput;
+  double used_bw;
+  unordered_map<int, int> ub_channels;
 
   TimeSlot(const vector<Channel> &);
   TimeSlot();
@@ -106,6 +110,7 @@ struct TimeSlot {
 
 class Solution {
 public:
+  map<int, double> throughput_dp;
   unordered_set<int> links_not_inserted;
   vector<TimeSlot> slots;
   double throughput_;
@@ -134,9 +139,11 @@ public:
   Connection &operator()(int t, int c, int l);
 };
 
+void to_json(json &, const Solution &);
+
 void init(void);
 
-Solution vns(string);
+vector<Solution> vns(string);
 
 bool is_feasible(const Solution &, bool);
 
@@ -238,6 +245,9 @@ int cToBIdx(int);
 int idxToB(int);
 
 int ChannelIdToBandwidth(int);
+
+double buildVRBSPSolution(vector<double>, vector<int>,
+                          optional<string> = std::nullopt);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 void var_Iij(GRBModel *, seila2 &, misi &);

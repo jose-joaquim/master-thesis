@@ -63,18 +63,12 @@ def distanceAndInterference(
     alfa,
 ):
     for i in range(nConnections):
-        X_si = receivers[i][0]
-        Y_si = receivers[i][1]
-
-        # X_si = senders[i][0]
-        # Y_si = senders[i][1]
+        X_si = senders[i][0]
+        Y_si = senders[i][1]
 
         for j in range(nConnections):
-            X_rj = senders[j][0]
-            Y_rj = senders[j][1]
-
-            # X_rj = receivers[j][0]
-            # Y_rj = receivers[j][1]
+            X_rj = receivers[j][0]
+            Y_rj = receivers[j][1]
 
             dist = distance(X_si, Y_si, X_rj, Y_rj)
             distanceMatrix[i][j] = dist
@@ -248,13 +242,9 @@ def average_spec_qtd(nConnections, gamma, dataRates):
 
 
 def initialize():
-    if len(sys.argv) != 6:
-        print("argument error")
-        sys.exit(1)
-
     load_overlap()
-    U_n = int(sys.argv[1])
 
+    U_n = 1024
     receivers = [[0 for i in range(2)] for _ in range(U_n)]
     senders = [[0 for i in range(2)] for _ in range(U_n)]
     DR = [[0 for i in range(4)] for _ in range(12)]
@@ -264,25 +254,16 @@ def initialize():
     IM = [[0 for i in range(U_n)] for _ in range(U_n)]
     gamma = [0 for i in range(U_n)]
 
-    inst = sys.argv[2]
-    p_type = "MD-VRBSP"
-    path = (
-        "../instances/md-vrbsp/U_"
-        + str(U_n)
-        + "/"
-        + p_type
-        + "_"
-        + "U_"
-        + str(U_n)
-        + "_"
-        + str(inst)
-        + ".txt"
-    )
-
-    print(path)
-
     (NOI, PS, alfa, N, NTS, B) = read_instance(
-        path, receivers, senders, gamma, DR, SINR, IM, DM, AFF,
+        sys.argv[1],
+        receivers,
+        senders,
+        gamma,
+        DR,
+        SINR,
+        IM,
+        DM,
+        AFF,
     )
 
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
@@ -372,7 +353,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         m = gp.Model("raw model")
         x, y, I_ = {}, {}, {}
 
-        if "mdvrbsp" in sys.argv[5]:
+        if "mdvrbsp" in sys.argv[2]:
             pw = (
                 "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
                 + str(N)
@@ -387,7 +368,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
                     NTS = int(sol.readline().split()[1])
                     print("new NTS is " + str(NTS))
 
-            if sys.argv[5] == "mdvrbsp-bigm":
+            if sys.argv[2] == "mdvrbsp-bigm":
                 import mdvrbsp_bigm_imp2 as mdBig
 
                 BM = computeBigM(N, IM, DM, AFF)
@@ -395,7 +376,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
                 m, x, I_ = mdBig.defineModel(
                     N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx, DR, GMM
                 )
-            elif sys.argv[5] == "mdvrbsp-quad":
+            elif sys.argv[2] == "mdvrbsp-quad":
                 import mdvrbsp_quadvars_imp2 as mdQuad
 
                 print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
@@ -417,7 +398,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
                 #
                 #     m.write("model2.lp")
 
-        elif sys.argv[5] == "vrbsp-xijcm":
+        elif sys.argv[2] == "vrbsp-xijcm":
             import vrbsp_xijc_bigm as vrX
 
             print("vrbsp xijcm")
@@ -427,7 +408,7 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
             )
 
             # sys.exit(1)
-        elif sys.argv[5] == "vrbsp-ybm":
+        elif sys.argv[2] == "vrbsp-ybm":
             import vrbsp_ybm_bigm as vrY
 
             print("vrbsp ybm")
@@ -438,20 +419,32 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         else:
             sys.exit(1)
 
-        # m.write(sys.argv[5] + ".lp")
-        if isfile("params.prm"):
-            m.read("params.prm")
-        else:
-            file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
-            m.Params.logFile = file_log
-            m.Params.logToConsole = 0
-            m.Params.timeLimit = 3600
-            m.Params.intFeasTol = 1e-6
-            m.Params.iisMethod = 1
+        # if isfile("params.prm"):
+        #     m.read("params.prm")
+        # else:
+        #     file_log = sys.argv[3] + "/log-inst" + str(sys.argv[2]) + ".txt"
+        #     m.Params.logFile = file_log
+        #     m.Params.logToConsole = 0
+        #     m.Params.timeLimit = 3600
+        #     m.Params.intFeasTol = 1e-6
+        #     m.Params.iisMethod = 1
 
+        import json
+
+        with open(
+            "/Users/jjaneto/git/master-thesis/results/dr/U_1024/solutionBRKGA1024_25.json"
+        ) as f:
+            ans = json.load(f)
+            for seila in ans["channels"]:
+                for ix in seila[1]:
+                    print(ix, seila[0])
+                    x[ix, seila[0]].lb = 1
+                    x[ix, seila[0]].ub = 1
+
+        m.write("seila.lp")
         m.optimize()
-        # m.write('sol.sol')
-        postProcess(m, x, I_, N, NTS, dicCH)
+        m.write("sol.sol")
+        # postProcess(m, x, I_, N, NTS, dicCH)
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
