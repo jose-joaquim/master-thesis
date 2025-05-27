@@ -429,18 +429,6 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         #     m.Params.intFeasTol = 1e-6
         #     m.Params.iisMethod = 1
 
-        import json
-
-        with open(
-            "/Users/jjaneto/git/master-thesis/results/dr/U_1024/solutionBRKGA1024_25.json"
-        ) as f:
-            ans = json.load(f)
-            for seila in ans["channels"]:
-                for ix in seila[1]:
-                    print(ix, seila[0])
-                    x[ix, seila[0]].lb = 1
-                    x[ix, seila[0]].ub = 1
-
         m.write("seila.lp")
         m.optimize()
         m.write("sol.sol")

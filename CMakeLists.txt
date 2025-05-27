@@ -42,11 +42,12 @@ if(USE_VNS_MATH_SOLVER
    OR USE_VRBSP_IP
    OR USE_MDVRBSP_IP
    OR USE_MDVRBSP_COL_GEN)
-  target_compile_definitions(basic PUBLIC USE_MATH_SOLVER)
+  target_compile_definitions(basic PUBLIC USE_VRBSP_IP)
 
   find_package(GUROBI REQUIRED)
   target_include_directories(basic PUBLIC "${GUROBI_INCLUDE_DIRS}")
   target_link_libraries(basic ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
+  target_link_libraries(basic nlohmann_json::nlohmann_json)
 else()
   target_link_libraries(basic nlohmann_json::nlohmann_json)
 endif()

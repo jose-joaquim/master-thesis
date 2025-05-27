@@ -13,7 +13,7 @@ void init(int argc, char **argv, FILE **solutionFile, FILE **objectivesFile) {
     if (!path_input.empty())
         freopen(path_input.c_str(), "r", stdin);
 
-    maximumTime = 10;
+    maximumTime = 300;
 
     if (stdin == nullptr) {
         fprintf(stderr, "error opening input file (stdin)\n");
@@ -56,6 +56,8 @@ int main(int argc, char **argv) {
 
     const unsigned n = numberVariables;
 
+    bool written = false;
+
     Solution decoder;
     MTRand rng;
     BRKGA<Solution, MTRand> algorithm(n, p, pe, pm, rhoe, decoder, rng, K, MAXT);
@@ -78,6 +80,7 @@ int main(int argc, char **argv) {
     bestIteration = 0;
 
     unsigned generation = 0;
+    double current_time;
     do {
         algorithm.evolve();
 
@@ -92,7 +95,14 @@ int main(int argc, char **argv) {
             bestIteration = quantIteracoes;
         }
         quantIteracoes++;
-    } while ((((double)(clock() - TempoFO_StarInic)) / CLOCKS_PER_SEC) < maximumTime);
+
+        current_time = (((double)(clock() - TempoFO_StarInic)) / CLOCKS_PER_SEC);
+        if (!written && current_time >= 60) {
+            written = true;
+            compute_and_save_best_solution(algorithm.getBestChromosome(),
+                                           algorithm.getBestFitness(), argv[3]);
+        }
+    } while (current_time < maximumTime);
 
     TempoExecTotal = (((double)(clock() - TempoFO_StarInic)) / CLOCKS_PER_SEC);
     vector<double> best = algorithm.getBestChromosome();

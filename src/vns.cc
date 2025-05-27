@@ -9,6 +9,7 @@ inline double elapsed_time(hrc::time_point from) {
 }
 
 vector<Solution> vns() {
+  const int MAX_TIME = 300;
   auto start = high_resolution_clock::now();
 
   Solution start_sol = CH_VRBSP();
@@ -19,10 +20,10 @@ vector<Solution> vns() {
 
   int K_MUL = max(1, N / 100);
   int K_MAX = N;
-  while (!stop(start, 300)) {
+  while (!stop(start, MAX_TIME)) {
     int k = 1;
     Solution candidate = inc_20;
-    while (!stop(start, 300) && k <= K_MAX) {
+    while (!stop(start, MAX_TIME) && k <= K_MAX) {
       candidate = perturbation(candidate, k * K_MUL);
       candidate = local_search(candidate);
 

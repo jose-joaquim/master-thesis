@@ -7,7 +7,7 @@ brkga: decoder.o
 
 decoder.o:
 	mkdir -p bin
-	g++ -std=c++20 -c -g -DUSE_DECODER ../../src/basic.cc -I../../include/ -I${JSON_PATH} -o basic.o
+	g++ -std=c++20 -c -g -DUSE_DECODER -DUSE_VNS_PURE ../../src/basic.cc -I../../include/ -I${JSON_PATH} -o basic.o
 
 clean:
 	rm -r ./bin

@@ -45,7 +45,7 @@ def defineModel(N, B, NC, MCS, OVER, DR, NS, AFF, SINR, BM):
     m = gp.Model("vrbsp ybm bigm")
 
     def variables():
-        x = m.addVars(N, NC, vtype=GRB.BINARY, name="x", ub=0)
+        x = m.addVars(N, NC, vtype=GRB.BINARY, name="x")
         y = m.addVars(N, B, MCS, vtype=GRB.BINARY, name="y")
         z = m.addVars(N, NC, vtype=GRB.BINARY, name="z")
         I_ = m.addVars(N, lb=0.0, vtype=GRB.CONTINUOUS, name="I")
@@ -61,49 +61,69 @@ def defineModel(N, B, NC, MCS, OVER, DR, NS, AFF, SINR, BM):
 
         # Constraint 2
         m.addConstrs(
-            gp.quicksum(y[i, b, m] for m in range(MCS))
-            <= gp.quicksum(x[i, c] for c in C_b[b])
-            for b in range(B)
-            for i in range(N)
+            (
+                gp.quicksum(y[i, b, m] for m in range(MCS))
+                <= gp.quicksum(x[i, c] for c in C_b[b])
+                for b in range(B)
+                for i in range(N)
+            ),
+            "couple",
         )
 
         # Constraint 3
         m.addConstrs(
-            gp.quicksum(x[i, c2] for c2 in range(NC) if OVER[c1][c2] == 1) == z[i, c1]
-            for c1 in range(NC)
-            for i in range(N)
+            (
+                gp.quicksum(x[i, c2] for c2 in range(NC) if OVER[c1][c2] == 1)
+                == z[i, c1]
+                for c1 in range(NC)
+                for i in range(N)
+            ),
+            "over",
         )
 
         # Constraint 4
         m.addConstrs(
-            gp.quicksum(AFF[u][i] * z[u, c] for u in range(N) if i != u) == Iij[i, c]
-            for c in range(NC)
-            for i in range(N)
+            (
+                gp.quicksum(AFF[u][i] * z[u, c] for u in range(N) if i != u)
+                == Iij[i, c]
+                for c in range(NC)
+                for i in range(N)
+            ),
+            "interch",
         )
 
         # Constraint 5
         m.addConstrs(
-            I_[i] <= Iij[i, c] + BM[i] * (1 - x[i, c])
-            for c in range(NC)
-            for i in range(N)
+            (
+                I_[i] <= Iij[i, c] + BM[i] * (1 - x[i, c])
+                for c in range(NC)
+                for i in range(N)
+            ),
+            "bigL",
         )
 
         # Constraint 6
         m.addConstrs(
-            I_[i] >= Iij[i, c] - BM[i] * (1 - x[i, c])
-            for c in range(NC)
-            for i in range(N)
+            (
+                I_[i] >= Iij[i, c] - BM[i] * (1 - x[i, c])
+                for c in range(NC)
+                for i in range(N)
+            ),
+            "bigG",
         )
 
         # Constraint 7
         m.addConstrs(
-            I_[i]
-            <= gp.quicksum(
-                y[i, b, m] * ((AFF[i][i] / SINR[m][b]) - NS)
-                for b in range(B)
-                for m in range(MCS)
-            )
-            for i in range(N)
+            (
+                I_[i]
+                <= gp.quicksum(
+                    y[i, b, m] * ((AFF[i][i] / SINR[m][b]) - NS)
+                    for b in range(B)
+                    for m in range(MCS)
+                )
+                for i in range(N)
+            ),
+            "sinr",
         )
 
     def objective(y):

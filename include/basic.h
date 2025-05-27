@@ -110,7 +110,6 @@ struct TimeSlot {
 
 class Solution {
 public:
-  map<int, double> throughput_dp;
   unordered_set<int> links_not_inserted;
   vector<TimeSlot> slots;
   double throughput_;
@@ -216,13 +215,13 @@ int compareObjectives(const Solution &lhs, const Solution &rhs);
 
 void removeAllOccurrences(Solution &sol, int id);
 
-double optimal_partitioning_global(Solution &);
+double optimal_partitioning_global(Solution &, bool = true);
 
 Solution local_search(const Solution &);
 
 optional<vector<Channel>> split(Channel toSplit, vector<double> *GMA = nullptr);
 
-void computeChannelsThroughput(vector<Channel> &channels);
+void computeChannelThroughput(Channel &);
 
 Solution perturbation(Solution &sol, int kkmul);
 
@@ -245,6 +244,8 @@ int cToBIdx(int);
 int idxToB(int);
 
 int ChannelIdToBandwidth(int);
+
+void fix_channels(Solution &);
 
 double buildVRBSPSolution(vector<double>, vector<int>,
                           optional<string> = std::nullopt);

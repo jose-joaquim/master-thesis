@@ -256,6 +256,22 @@ inline double distance(double X_si, double Y_si, double X_ri, double Y_ri) {
   return hypot((X_si - X_ri), (Y_si - Y_ri));
 }
 
+void fix_channels(Solution &sol) {
+  vector<int> infeas_conns;
+  for (const Channel &ch : sol(0).channels)
+    for (const Connection &conn : ch.connections)
+      if (approximatelyEqual(0.0, conn.throughput))
+        infeas_conns.push_back(conn.id);
+
+  // if (!infeas_conns.empty())
+  //   printf("removing %lu\n", infeas_conns.size());
+
+  for (const int ix : infeas_conns)
+    sol.remove_connection(ix);
+
+  computeThroughput(sol);
+}
+
 void distanceAndInterference() {
   for (int i = 0; i < N; i++) {
     double sender_i_x = senders[i][0];
@@ -498,6 +514,7 @@ void insertBestChannel(Solution &sol, int conn, int band,
     return;
 
   const auto &[ts, ch] = nCh;
+  Channel old_channel = sol(ts, ch);
   sol(ts, ch) = seilaaaa;
   sol.throughput_ = max_throughput;
 
@@ -549,6 +566,15 @@ double buildVRBSPSolution(vector<double> variables, vector<int> permutation,
     insertBestChannel(sol, connection, bandWidth, variables);
     idx += 1;
   }
+
+  fix_channels(sol);
+
+  Solution seila = convertTo20MhzSol(sol);
+  Solution best_multiple = multipleRepresentation(seila);
+  double dp_of = optimal_partitioning_global(best_multiple, false);
+  if (!(definitelyGreaterThan(dp_of, sol.throughput_) ||
+        approximatelyEqual(dp_of, sol.throughput_)))
+    printf("%lf %lf\n", dp_of, sol.throughput_);
 
   int cnt_160 = 0, cnt_80 = 0, cnt_40 = 0, cnt_20 = 0;
 
@@ -665,6 +691,31 @@ Solution CH_MDVRBSP() {
   return ret;
 }
 #endif
+
+Channel erase_connection_from_channel(Channel ch, int id) {
+  Channel ch_new = ch;
+  ch_new.connections.clear();
+  ch_new.throughput = 0.0;
+  for (const Connection &i : ch.connections)
+    if (i.id != id)
+      ch_new = *insertInChannel(ch_new, i.id, true);
+
+  return ch_new;
+}
+
+int Solution::remove_connection(int i) {
+  int found = -1;
+
+  for (int ts = 0; ts < slots.size(); ++ts)
+    for (int c = 0; c < slots[ts].channels.size(); ++c)
+      for (const Connection &l : slots[ts].channels[c].connections)
+        if (l.id == i) {
+          (*this)(ts, c) = erase_connection_from_channel((*this)(ts, c), i);
+          found = c;
+        }
+
+  return found;
+}
 
 void read_data() {
   int n_spectrums;
@@ -825,25 +876,39 @@ void reinsert(Solution &sol, Connection conn, ii from, ii to) {
   const auto &[ft, fc] = from;
   const auto &[tt, tc] = to;
 
-  double obj_part_remove = 0;
-  double obj_part_add = 0;
   if (from != make_pair(-1, -1)) {
-    Channel &old_chan = sol(ft, fc);
-    obj_part_remove = old_chan.throughput;
-
-    old_chan = *deleteFromChannel(old_chan, conn.id);
-    obj_part_add = old_chan.throughput;
+    for (int j = 0; const Connection &connection : sol(ft, fc).connections)
+      if (conn.id == connection.id) {
+        swap(sol(ft, fc).connections[j], sol(ft, fc).connections.back());
+        sol(ft, fc).connections.pop_back();
+        break;
+      } else {
+        j++;
+      }
   }
 
-  if (to != make_pair(-1, -1)) {
-    Channel &new_chan = sol(tt, tc);
-    obj_part_remove += new_chan.throughput;
+  if (to != make_pair(-1, -1))
+    sol(tt, tc).connections.push_back(conn);
 
-    new_chan = *insertInChannel(new_chan, conn.id, true);
-    obj_part_add += new_chan.throughput;
-  }
-
-  sol.throughput_ = sol.throughput_ + obj_part_add - obj_part_remove;
+  // double obj_part_remove = 0;
+  // double obj_part_add = 0;
+  // if (from != make_pair(-1, -1)) {
+  //   Channel &old_chan = sol(ft, fc);
+  //   obj_part_remove = old_chan.throughput;
+  //
+  //   old_chan = *deleteFromChannel(old_chan, conn.id);
+  //   obj_part_add = old_chan.throughput;
+  // }
+  //
+  // if (to != make_pair(-1, -1)) {
+  //   Channel &new_chan = sol(tt, tc);
+  //   obj_part_remove += new_chan.throughput;
+  //
+  //   new_chan = *insertInChannel(new_chan, conn.id, true);
+  //   obj_part_add += new_chan.throughput;
+  // }
+  //
+  // sol.throughput_ = sol.throughput_ + obj_part_add - obj_part_remove;
 }
 
 void K_RemoveAndInserts(Solution &sol, int K) {
@@ -915,6 +980,7 @@ Solution perturbation(Solution &sol, int kkmul) {
     K_RemoveAndInserts(sol, kkmul);
 
   computeThroughput(sol);
+  fix_channels(sol);
 
   return sol;
 }
@@ -1119,17 +1185,6 @@ double calcDP(Solution &sol, int t, int c, int depth) {
 
 Solution rebuild_solution(Solution to_rebuild) { return to_rebuild; }
 
-Channel erase_connection_from_channel(Channel ch, int id) {
-  Channel ch_new = ch;
-  ch_new.connections.clear();
-  ch_new.throughput = 0.0;
-  for (const Connection &i : ch.connections)
-    if (i.id != id)
-      ch_new = *insertInChannel(ch_new, i.id, true);
-
-  return ch_new;
-}
-
 double Solution::optimal_partitioning() {
   // 1. Create multiple representation
   Solution multiple = multipleRepresentation(*this);
@@ -1155,20 +1210,6 @@ bool Solution::insert_connnection(int i, int t, int c) {
   (*this)(t, c) = *new_channel;
 
   return true;
-}
-
-int Solution::remove_connection(int i) {
-  int found = -1;
-
-  for (int ts = 0; ts < slots.size(); ++ts)
-    for (int c = 0; c < slots[ts].channels.size(); ++c)
-      for (const Connection &l : slots[ts].channels[c].connections)
-        if (l.id == i) {
-          (*this)(ts, c) = erase_connection_from_channel((*this)(ts, c), i);
-          found = c;
-        }
-
-  return found;
 }
 
 void Solution::get_optimal_solution(Solution &sol, int t, int c, bool remove) {
@@ -1214,8 +1255,10 @@ Solution Solution::get_optimal_solution() {
   return ret;
 }
 
-double optimal_partitioning_global(Solution &multiple) {
-  computeThroughput(multiple);
+double optimal_partitioning_global(Solution &multiple, bool compute_of) {
+  if (compute_of)
+    computeThroughput(multiple);
+
   multiple.throughput_ = 0.0;
 
   for (int t = 0; t < multiple.slots.size(); ++t)
@@ -1228,10 +1271,23 @@ double optimal_partitioning_global(Solution &multiple) {
   return multiple.throughput_;
 }
 
+void computeChannelThroughput(Channel &ch) {
+  ch.throughput = 0.0;
+  for (Connection &u : ch.connections) {
+    u.interference = 0.0;
+    u.throughput = 0.0;
+    for (Connection &v : ch.connections)
+      u.interference += u.id == v.id ? 0.0 : AFF[v.id][u.id];
+
+    ch.throughput += computeConnectionThroughput(u, ch.bandwidth);
+  }
+}
+
 int insert_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
   double highest = -1;
   do {
     sol(ts, channel).connections.push_back(Connection(i));
+    computeChannelThroughput(sol(ts, channel));
     channel = sol(ts, channel).parent;
 
     if (channel != -1)
@@ -1253,6 +1309,9 @@ void erase_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
         deletion_ok = true;
       }
 
+    assert(deletion_ok);
+    computeChannelThroughput(sol(ts, channel));
+
     channel = sol(ts, channel).parent;
   } while (channel != -1);
 }
@@ -1260,7 +1319,7 @@ void erase_connection_up_to_root(Solution &sol, int i, int ts, int channel) {
 #if defined(USE_VNS_PURE)
 Solution local_search(const Solution &sol20) {
   Solution best_multiple = multipleRepresentation(sol20);
-  double start_of = optimal_partitioning_global(best_multiple);
+  double start_of = optimal_partitioning_global(best_multiple, false);
   double best_found_before;
   do {
     best_found_before = best_multiple.throughput_;
@@ -1277,9 +1336,12 @@ Solution local_search(const Solution &sol20) {
 
       for (int ts = 0; ts < sol20.slots.size(); ++ts)
         for (int c = 0; c < sol20.slots[ts].channels.size(); ++c) {
-          insert_connection_up_to_root(baseline, i, ts, c);
+          int highest = insert_connection_up_to_root(baseline, i, ts, c);
 
-          candidate = optimal_partitioning_global(baseline);
+          if (highest == -1)
+            highest = c;
+
+          candidate = optimal_partitioning_global(baseline, false);
           if (candidate > best_of_i.first)
             best_of_i = {candidate, {ts, c}};
 
@@ -1308,11 +1370,6 @@ Solution local_search(const Solution &sol20) {
     for (int c = 0; c < 25; ++c)
       ret(t).channels.push_back(best_multiple(t, c));
 
-  double old = best_multiple.throughput_;
-  optimal_partitioning_global(best_multiple);
-  assert(approximatelyEqual(best_multiple.throughput_, old));
-
-  // printf("entered %.3lf and outputs %.3lf\n", start_of, ret.throughput_);
   return ret;
 }
 
@@ -1576,13 +1633,13 @@ Solution vrbsp(misi &connections_channels) {
   // printf("constraints...\n");
   unique(model, x);
   couple(model, y, x);
-  interference(model, I, x);
-  // ch_overlap(model, z, x);
-  // interch(model, z, Iij);
-  // bigG(model, I, Iij, x);
-  // bigL(model, I, Iij, x);
+  // interference(model, I, x);
+  ch_overlap(model, z, x);
+  interch(model, z, Iij);
+  bigG(model, I, Iij, x);
+  bigL(model, I, Iij, x);
   sinr(model, I, y);
-  seila_constr(model, x);
+  // seila_constr(model, x);
   //
   model->update();
   model->set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
