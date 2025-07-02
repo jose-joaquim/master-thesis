@@ -13,6 +13,7 @@ vector<Solution> vns() {
   auto start = high_resolution_clock::now();
 
   Solution start_sol = CH_VRBSP();
+  label_channels(start_sol);
   Solution inc = start_sol;
   printf("%.4lf,%.4lf\n", inc.throughput_, elapsed_time(start));
 

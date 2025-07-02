@@ -13,7 +13,7 @@
 #include <unordered_set>
 #include <vector>
 
-const int C = 45;
+const int C = 45, M = 12, BAND = 4;
 const int MAX_CONN = 2048;
 const int X_c = 0;
 const int Y_c = 1;
@@ -28,16 +28,6 @@ using misi = map<int, unordered_set<int>>;
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 #include "gurobi_c++.h"
-
-using mt3 = map<tuple<int, int, int>, GRBVar>;
-using mt2 = map<tuple<int, int>, GRBVar>;
-using mivar = map<int, GRBVar>;
-using seila = map<int, mivar>;
-using seila2 = map<int, seila>;
-using seila3 = map<int, seila2>;
-using x_structure = vector<seila>;
-using y_structure = vector<seila2>;
-
 #endif
 
 using ii = pair<int, int>;
@@ -61,6 +51,7 @@ extern vector<vector<int>> overlap;
 
 struct Connection {
   int id;
+  int mcs;
   double throughput;
   double interference;
   double SINR;
@@ -199,7 +190,7 @@ Solution reconstruct_sol(Solution &curr);
 
 Solution multipleRepresentation(Solution ret);
 
-Solution convertTo20MhzSol(Solution exps);
+Solution convertTo20MhzSol(Solution &);
 
 bool allChannels20MHz(const Solution &sol);
 
@@ -250,32 +241,34 @@ void fix_channels(Solution &);
 double buildVRBSPSolution(vector<double>, vector<int>,
                           optional<string> = std::nullopt);
 
+void label_channels(Solution &);
+
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
-void var_Iij(GRBModel *, seila2 &, misi &);
+void var_Iij(GRBModel *, GRBVar[][C], misi &);
 
-void var_z(GRBModel *, seila2 &, misi &);
+void var_z(GRBModel *, GRBVar[][C], misi &);
 
-void var_I(GRBModel *, mivar &, misi &);
+void var_I(GRBModel *, GRBVar[], misi &);
 
 void var_t(GRBModel *, GRBVar *, vector<int> &, misi &);
 
-void var_x(GRBModel *, seila2 &, misi &);
+void var_x(GRBModel *, GRBVar[][C], misi &);
 
-void var_y(GRBModel *, seila3 &, misi &);
+void var_y(GRBModel *, GRBVar[][BAND][M], misi &);
 
-void unique(GRBModel *, seila2 &);
+void unique(GRBModel *, GRBVar[][C]);
 
-void couple(GRBModel *, seila3 &, seila2 &);
+void couple(GRBModel *, GRBVar[][BAND][M], GRBVar[][C]);
 
-void ch_overlap(GRBModel *, seila2 &, seila2 &);
+void ch_overlap(GRBModel *, GRBVar[][C], GRBVar[][C]);
 
-void interch(GRBModel *, seila2 &, seila2 &);
+void interch(GRBModel *, GRBVar[][C], GRBVar[][C]);
 
-void bigG(GRBModel *, mivar &, seila2 &, seila2 &);
+void bigG(GRBModel *, GRBVar[], GRBVar[][C], GRBVar[][C]);
 
-void bigL(GRBModel *, mivar &, seila2 &, seila2 &);
+void bigL(GRBModel *, GRBVar[], GRBVar[][C], GRBVar[][C]);
 
-void sinr(GRBModel *, mivar &, seila3 &);
+void sinr(GRBModel *, GRBVar[], GRBVar[][BAND][M]);
 
 Solution vrbsp(misi &);
 #endif

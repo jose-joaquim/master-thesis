@@ -13,14 +13,14 @@ seed = 1
 shuffled_instances = (2 ** pl.int_range(3, 12, eager=True).shuffle(seed=seed)).to_list()
 shuffled_order = pl.int_range(1, 31, eager=True).shuffle(seed=seed).to_list()
 
-instances_backup = [1024, 2048]
+instances_backup = shuffled_instances
 
 order_backup = [
-    25,
-    7,
-    28,
-    19,
-    1,
+    # 25,
+    # 7,
+    # 28,
+    # 19,
+    # 1,
     # 5,
     # 29,
     # 15,
@@ -46,6 +46,10 @@ order_backup = [
     # 6,
     # 2,
     # 22,
+    31,
+    32,
+    33,
+    34,
 ]
 
 # for L in shuffled_instances:
@@ -64,6 +68,7 @@ for L in instances_backup:
         ch_json = f"{output_path}/solutionCH{L}_{i}.json"
         vns_json = f"{output_path}/solutionVNS{L}_{i}.json"
         brkga_json = f"{output_path}/solutionBRKGA{L}_{i}.json"
+        brkga_partial = f"{output_path}/solutionBRKGA_mid{L}_{i}.json"
 
         run = subprocess.run(
             [vns_program_path, instance_path, ch_json, vns_json],
@@ -85,7 +90,7 @@ for L in instances_backup:
         df.write_csv(f"{output_path}/progress{L}_{i}.csv")
 
         run = subprocess.run(
-            [brkga_program_path, instance_path, brkga_json],
+            [brkga_program_path, instance_path, brkga_json, brkga_partial],
             capture_output=True,
             text=True,
             cwd="./",

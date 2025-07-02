@@ -11,7 +11,8 @@ if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_VNS_PURE
    AND NOT USE_VRBSP_IP
    AND NOT USE_MDVRBSP_IP
-   AND NOT USE_MRVRBSP_COL_GEN)
+   AND NOT USE_MRVRBSP_COL_GEN
+   AND NOT USE_VRBSP_COL_GEN)
   message(FATAL_ERROR "You need to select an option!")
 endif()
 
@@ -23,7 +24,9 @@ endif()
 
 include(FetchContent)
 
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_Declare(
+  json
+  URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
 FetchContent_MakeAvailable(json)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -41,7 +44,8 @@ include_directories("./include")
 if(USE_VNS_MATH_SOLVER
    OR USE_VRBSP_IP
    OR USE_MDVRBSP_IP
-   OR USE_MDVRBSP_COL_GEN)
+   OR USE_MDVRBSP_COL_GEN
+   OR USE_VRBSP_COL_GEN)
   target_compile_definitions(basic PUBLIC USE_VRBSP_IP)
 
   find_package(GUROBI REQUIRED)
@@ -68,6 +72,8 @@ elseif(USE_MDVRBSP_IP)
   target_compile_definitions(basic PUBLIC USE_MDVRBSP_IP)
   add_executable(mdvrbsp_ip "./src/mdvrbsp.cc")
   target_link_libraries(mdvrbsp_ip basic)
-elseif(USE_MDVRBSP_COL_GEN)
-
+elseif(USE_VRBSP_COL_GEN)
+  target_compile_definitions(basic PUBLIC USE_VRBSP_IP)
+  add_executable(vrbsp_col_gen "./src/vrbsp_col_gen.cc")
+  target_link_libraries(vrbsp_col_gen basic)
 endif()
