@@ -3,7 +3,7 @@ import math
 from gurobipy import GRB
 
 
-def defineAlternative1st(
+def defineAlternative1(
     N,  # nConnections
     B,  # set of channel bandwidths (MHz) [20,40,80,160]
     NC,  # set of subdivisions of the electromagnetic spectrum into communication channels
@@ -57,7 +57,8 @@ def defineAlternative1st(
             return 2
         return 3
 
-    m = gp.Model("alternative1st")
+    BigM = [max(AFF[u][i] for u in range(N)) for i in range(N)]
+    m = gp.Model("alternative1")
 
     def variables():
         x = m.addVars(N, NC, vtype=GRB.BINARY, name="x")
@@ -67,22 +68,37 @@ def defineAlternative1st(
 
     def constraints(x, y):
         m.addConstrs(
-            gp.quicksum(y[i, b, m] for m in range(MCS))
-            <= gp.quicksum(x[i, c] for c in C_b[b])
-            for b in range(B)
-            for i in range(N)
+            (gp.quicksum(x[i, c] for c in range(NC)) <= 1.0 for i in range(N)), "unique"
         )
 
         m.addConstrs(
-            gp.quicksum(SINR[m][c_to_b(c)] * y[i, c_to_b(c), m] for m in range(MCS))
-            >= gp.quicksum(
-                AFF[u][i] * x[i, c] * x[u, c_]
-                for c_ in C_b[c_to_b(c)]
-                for u in range(N)
-                if u != i
-            )
-            for i in range(N)
-            for c in range(NC)
+            (
+                gp.quicksum(y[i, b, m] for m in range(MCS))
+                <= gp.quicksum(x[i, c] for c in C_b[b])
+                for b in range(B)
+                for i in range(N)
+            ),
+            "couple",
+        )
+
+        m.addConstrs(
+            (
+                gp.quicksum(
+                    (AFF[i][i] / SINR[m][c_to_b(c)]) * y[i, c_to_b(c), m]
+                    for m in range(MCS)
+                )
+                >= gp.quicksum(
+                    AFF[u][i] * x[u, c_]
+                    for c_ in range(NC)
+                    if OVER[c][c_]
+                    for u in range(N)
+                    if u != i
+                )
+                - BigM[i] * (1 - x[i, c])
+                for i in range(N)
+                for c in range(NC)
+            ),
+            "sinr",
         )
 
     def objective(y):
@@ -97,3 +113,8 @@ def defineAlternative1st(
                 )
             ),
         )
+
+    x, y = variables()
+    constraints(x, y)
+    objective(y)
+    return m, x, y

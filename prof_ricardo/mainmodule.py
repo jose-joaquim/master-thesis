@@ -266,19 +266,20 @@ def initialize():
         AFF,
     )
 
-    # N :   nConnections, 
-    # NTS : time-slots, 
-    # SINR :SINR, 
-    # PS :  power_sender, 
-    # NOI : noise, 
-    # B :   beta, 
-    # IM :  intermatrix, 
-    # DM :  distancematrix, 
-    # AFF : affectance, 
-    # DR :  datarates, 
-    # gamma : inst, 
+    # N :   nConnections,
+    # NTS : time-slots,
+    # SINR :SINR,
+    # PS :  power_sender,
+    # NOI : noise,
+    # B :   beta,
+    # IM :  intermatrix,
+    # DM :  distancematrix,
+    # AFF : affectance,
+    # DR :  datarates,
+    # gamma : inst,
     # version
     return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, gamma
+
 
 def postProcess(m, x, I_, N, NTS, dic):
     from gurobipy import GRB
@@ -363,90 +364,47 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
         m = gp.Model("raw model")
         x, y, I_ = {}, {}, {}
 
-        if "mdvrbsp" in sys.argv[2]:
-            pw = (
-                "../vns/results/mdvrbsp_MINMAX_RANDOM/U_"
-                + str(N)
-                + "/solution"
-                + str(sys.argv[2])
-                + ".mst"
-            )
-
-            if isfile(pw):
-                print("found warm start solution")
-                with open(pw, "r") as sol:
-                    NTS = int(sol.readline().split()[1])
-                    print("new NTS is " + str(NTS))
-
-            if sys.argv[2] == "mdvrbsp-bigm":
-                import mdvrbsp_bigm_imp2 as mdBig
-
-                BM = computeBigM(N, IM, DM, AFF)
-                print("CREATING MDVRBSP BIG-M MODEL")
-                m, x, I_ = mdBig.defineModel(
-                    N, NTS, BM, AFF, dicCH, B, NOI, overlap, cToBIdx, DR, GMM
-                )
-            elif sys.argv[2] == "mdvrbsp-quad":
-                import mdvrbsp_quadvars_imp2 as mdQuad
-
-                print("CREATING MDVRBRSP QUAD LINEARIZATION MODEL")
-                m, x, I_ = mdQuad.defineModel(
-                    N, NTS, AFF, dicCH, B, NOI, overlap, cToBIdx, DR, GMM
-                )
-
-            m.update()
-            if isfile(pw):
-                m.read(pw)
-                # with open("./warm.mst", "r") as sol:
-                #     for line in sol:
-                #         arr = line.split()
-                #         if arr[0] == "#":
-                #             continue
-                #
-                #         m.getVarByName(arr[0]).ub = float(arr[1])
-                #         m.getVarByName(arr[0]).lb = float(arr[1])
-                #
-                #     m.write("model2.lp")
-
-        elif sys.argv[2] == "vrbsp-xijcm":
-            import vrbsp_xijc_bigm as vrX
-
-            print("vrbsp xijcm")
-            BM = computeBigM(N, IM, DM, AFF)
-            m, x, I_ = vrX.defineModel(
-                N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM, cToBIdx
-            )
-
-            # sys.exit(1)
-        elif sys.argv[2] == "vrbsp-ybm":
+        if sys.argv[2] == "vrbsp-ybm":
             import vrbsp_ybm_bigm as vrY
 
             print("vrbsp ybm")
             BM = computeBigM(N, IM, DM, AFF)
             m, x, y, I_ = vrY.defineModel(N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM)
 
-            # sys.exit(1)
-        elif sys.argv[2] == "nonlinear":
-            import disj_prog as disj
-
-            print("nonlinear")
-            BM = computeBigM(N, IM, DM, AFF)
-            m, x, y = disj.defineModelNonLinear(N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM)
-
-            # sys.exit(1)
         elif sys.argv[2] == "disj":
             import disj_prog as disj
 
             print("disj ")
             BM = computeBigM(N, IM, DM, AFF)
-            m, x, y = disj.defineModelDisj(N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM)
+            m, x, y = disj.defineModelDisj(
+                N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM
+            )
+
+        elif sys.argv[2] == "alternative1":
+            import alternative1 as alternative1
+
+            print("alternative1")
+            BM = computeBigM(N, IM, DM, AFF)
+            m, x, y = alternative1.defineAlternative1(
+                N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM
+            )
+
+        elif sys.argv[2] == "alternative2":
+            import alternative2 as alternative2
+
+            print("alternative2")
+            BM = computeBigM(N, IM, DM, AFF)
+            m, x, y = alternative2.defineAlternative2(
+                N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM
+            )
 
         else:
             sys.exit(1)
 
+        m.write("model.lp")
         m.optimize()
-        print(f'\n\n obj : {m.objval:10.2f}')
-        # postProcess(m, x, I_, N, NTS, dicCH)
+        m.write("sol.sol")
+        print(f"\n\n obj : {m.objval:10.2f}")
 
     except gp.GurobiError as e:
         print("Error code " + str(e.errno) + ": " + str(e))
