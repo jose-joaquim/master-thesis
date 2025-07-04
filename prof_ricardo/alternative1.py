@@ -63,8 +63,10 @@ def defineAlternative1(
     def variables():
         x = m.addVars(N, NC, vtype=GRB.BINARY, name="x")
         y = m.addVars(N, B, MCS, vtype=GRB.BINARY, name="y")
+        w = m.addVars(N, N, NC, NC, vtype=GRB.BINARY, name="w")
+        z = m.addVars(N, B, NC, MCS, vtype=GRB.BINARY, name="z")
 
-        return x, y
+        return x, y, w, z
 
     def constraints(x, y):
         m.addConstrs(
@@ -114,7 +116,7 @@ def defineAlternative1(
             ),
         )
 
-    x, y = variables()
+    x, y, w, z = variables()
     constraints(x, y)
     objective(y)
     return m, x, y

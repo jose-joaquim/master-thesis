@@ -201,10 +201,18 @@ def read_instance(
             alfa,
         )
 
+        AFF_c = {}
         for i in range(nConnections):
             for j in range(nConnections):
                 value = powerSender / math.pow(distanceMatrix[i][j], alfa)
                 AFF[i][j] = value
+
+        for c in range(46):
+            AFF_c[c] = (
+                AFF
+                if c < 45
+                else [[0.0 for i in range(nConnections)] for _ in range(nConnections)]
+            )
 
         beta = [[0.0 for _ in range(4)] for _ in range(nConnections)]
         for j in range(nConnections):
@@ -212,7 +220,7 @@ def read_instance(
                 beta[j][i] = gammaToBeta(gamma[j], dataRates, SINR, i)
 
         time_slots = average_spec_qtd(nConnections, gamma, dataRates)
-        return noise, powerSender, alfa, nConnections, time_slots, beta
+        return noise, powerSender, alfa, nConnections, time_slots, beta, AFF_c
 
 
 def average_spec_qtd(nConnections, gamma, dataRates):
@@ -244,7 +252,7 @@ def average_spec_qtd(nConnections, gamma, dataRates):
 def initialize():
     load_overlap()
 
-    U_n = 1024
+    U_n = 8
     receivers = [[0 for i in range(2)] for _ in range(U_n)]
     senders = [[0 for i in range(2)] for _ in range(U_n)]
     DR = [[0 for i in range(4)] for _ in range(12)]
@@ -254,7 +262,7 @@ def initialize():
     IM = [[0 for i in range(U_n)] for _ in range(U_n)]
     gamma = [0 for i in range(U_n)]
 
-    (NOI, PS, alfa, N, NTS, B) = read_instance(
+    (NOI, PS, alfa, N, NTS, B, AFF_c) = read_instance(
         sys.argv[1],
         receivers,
         senders,
@@ -278,7 +286,7 @@ def initialize():
     # DR :  datarates,
     # gamma : inst,
     # version
-    return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, gamma
+    return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, gamma, AFF_c
 
 
 def postProcess(m, x, I_, N, NTS, dic):
@@ -321,7 +329,7 @@ def computeBigM(nConnections, interferenceMatrix, distanceMatrix, AFF):
     return ret
 
 
-def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
+def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, AFF_c, warm=False):
     import gurobipy as gp
     from os.path import isfile
 
@@ -398,6 +406,15 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
                 N, 4, 45, 12, overlap, DR, NOI, AFF, SINR, BM
             )
 
+        elif sys.argv[2] == "alternative3":
+            import alternative3 as alternative3
+
+            print("alternative3")
+            BM = computeBigM(N, IM, DM, AFF)
+            m, x, y = alternative3.defineModelBalas(
+                N, 4, 46, 12, overlap, DR, NOI, AFF, SINR, BM, AFF_c
+            )
+
         else:
             sys.exit(1)
 
@@ -414,6 +431,6 @@ def opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, warm=False):
 
 
 if __name__ == "__main__":
-    N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM = initialize()
+    N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, AFF_c = initialize()
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
-    opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM)
+    opt(N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, GMM, AFF_c)
