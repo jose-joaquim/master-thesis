@@ -11,7 +11,7 @@ if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_VNS_PURE
    AND NOT USE_VRBSP_IP
    AND NOT USE_MDVRBSP_IP
-   AND NOT USE_MRVRBSP_COL_GEN
+   AND NOT USE_MDVRBSP_COL_GEN
    AND NOT USE_VRBSP_COL_GEN)
   message(FATAL_ERROR "You need to select an option!")
 endif()
@@ -76,4 +76,8 @@ elseif(USE_VRBSP_COL_GEN)
   target_compile_definitions(basic PUBLIC USE_VRBSP_IP)
   add_executable(vrbsp_col_gen "./src/vrbsp_col_gen.cc")
   target_link_libraries(vrbsp_col_gen basic)
+elseif(USE_MDVRBSP_COL_GEN)
+  target_compile_definitions(basic PUBLIC USE_MDVRBSP_COL_GEN)
+  add_executable(mdvrbsp_col_gen "./src/mdvrbsp_col_gen.cc")
+  target_link_libraries(mdvrbsp_col_gen basic nlohmann_json::nlohmann_json)
 endif()
