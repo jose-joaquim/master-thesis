@@ -1,5 +1,4 @@
 #include "basic.h"
-#include "gurobi_c.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -15,6 +14,9 @@ using mt3 = map<tuple<int, int, int>, GRBVar>;
 
 FILE *progress_file;
 
+const uint32_t seed = 77;
+
+Instance instance;
 int N, T, cnt;
 double alfa, NOI, powerSender;
 double receivers[MAX_CONN][2], senders[MAX_CONN][2];
@@ -22,10 +24,8 @@ double AFF[MAX_CONN][MAX_CONN];
 double DM[MAX_CONN][MAX_CONN];
 vector<vector<double>> DR, SINR, B;
 
-random_device rd;
-mt19937 gen{rd()};
+mt19937 gen{seed};
 uniform_int_distribution<> dist{0, MAX_CONN};
-default_random_engine whatever = default_random_engine{rd()};
 vector<double> GMM, BM;
 map<pair<int, int>, vector<int>> overlappings;
 
@@ -434,7 +434,7 @@ bool can_split(const Channel &ch) {
   return true;
 }
 
-#if defined(USE_DECODER)
+#if defined(USE_BRKGA)
 int convertChromoBandwidth(double value) {
   if (value < .25)
     return 20;
@@ -640,16 +640,16 @@ double Solution::decode(std::vector<double> variables) const {
 #if defined(USE_MDVRBSP_IP)
 Solution CH_MDVRBSP() {
   // TODO: need to fix because I included timeslots
-  Channel ch160(160);
-  Channel ch80(80);
-  Channel ch20(20);
+  Channel ch160(160, {});
+  Channel ch80(80, {});
+  Channel ch20(20, {});
   vector<Channel> chs{ch160, ch160, ch80, ch20};
   TimeSlot dummy_ts(chs);
   Solution ret({dummy_ts});
 
   vector<int> links(N);
   iota(links.begin(), links.end(), 0);
-  shuffle(links.begin(), links.end(), whatever);
+  shuffle(links.begin(), links.end(), gen);
 
   for (int conn : links) {
     for (int t = 0; t < ret.slots.size(); t++) {
@@ -918,26 +918,19 @@ void reinsert(Solution &sol, Connection conn, ii from, ii to) {
 
   if (to != make_pair(-1, -1))
     sol(tt, tc).connections.push_back(conn);
+}
 
-  // double obj_part_remove = 0;
-  // double obj_part_add = 0;
-  // if (from != make_pair(-1, -1)) {
-  //   Channel &old_chan = sol(ft, fc);
-  //   obj_part_remove = old_chan.throughput;
-  //
-  //   old_chan = *deleteFromChannel(old_chan, conn.id);
-  //   obj_part_add = old_chan.throughput;
-  // }
-  //
-  // if (to != make_pair(-1, -1)) {
-  //   Channel &new_chan = sol(tt, tc);
-  //   obj_part_remove += new_chan.throughput;
-  //
-  //   new_chan = *insertInChannel(new_chan, conn.id, true);
-  //   obj_part_add += new_chan.throughput;
-  // }
-  //
-  // sol.throughput_ = sol.throughput_ + obj_part_add - obj_part_remove;
+void reinsert(Solution &sol, vector<tuple<int, int, int>> conns, ii to) {
+  for (const auto &[ft, fc, ix] : conns) {
+    for (int j = 0; const Connection &connection : sol(ft, fc).connections)
+      if (ix == connection.id) {
+        swap(sol(ft, fc).connections[j], sol(ft, fc).connections.back());
+        sol(ft, fc).connections.pop_back();
+        break;
+      } else {
+        j++;
+      }
+  }
 }
 
 void K_RemoveAndInserts(Solution &sol, int K) {
@@ -948,12 +941,8 @@ void K_RemoveAndInserts(Solution &sol, int K) {
     set_unscheduled.insert(i);
 
   K = min(K, int(sol.get_scheduled_connections().size()));
-  // assert(!sol.get_scheduled_connections().empty());
-  // for (const Connection &conn : sol.get_scheduled_connections()) {
-  //   assert(set_unscheduled.contains(conn.id));
-  //   set_unscheduled.erase(conn.id);
-  // }
 
+  vector<tuple<int, int, int>> connections_to_remove;
   while (k < K) {
     int t = random_number(sol.slots.size());
     int a = random_number(sol(t).channels.size());
@@ -965,39 +954,44 @@ void K_RemoveAndInserts(Solution &sol, int K) {
     int z = random_number(ch.connections.size());
     Connection conn = ch.connections[z];
 
-    reinsert(sol, conn, {t, a}, {-1, -1});
-    // printf("removed schedule %d %d %d\n", t, a, conn.id);
+    connections_to_remove.push_back({t, a, conn.id});
+    // reinsert(sol, conn, {t, a}, {-1, -1});
     k++;
   }
+
+  reinsert(sol, connections_to_remove, {-1, -1});
 
   K_AddDrop(sol, K);
 }
 
 void K_AddDrop(Solution &sol, int K) {
-  set<int> set_unscheduled;
+  set<pair<int, int>> set_unscheduled;
   for (int i = 0; i < N; ++i)
-    set_unscheduled.insert(i);
+    set_unscheduled.insert({i, false});
 
   for (const TimeSlot &st : sol.slots)
     for (const Channel &ch : st.channels)
       for (const Connection &conn : ch.connections) {
-        assert(set_unscheduled.contains(conn.id));
-        set_unscheduled.erase(conn.id);
+        assert(set_unscheduled.contains({conn.id, false}));
+        set_unscheduled.erase({conn.id, false});
       }
 
-  vector<int> unscheduled(set_unscheduled.begin(), set_unscheduled.end());
+  vector<pair<int, int>> unscheduled(set_unscheduled.begin(),
+                                     set_unscheduled.end());
   K = min(K, int(unscheduled.size()));
   for (int i = 0; i < K; ++i) {
     int ix = random_number(unscheduled.size());
-    int conn = unscheduled[ix];
+    if (unscheduled[ix].second)
+      continue;
 
     int t = random_number(sol.slots.size());
     int a = random_number(sol(t).channels.size());
     pair<int, int> channelTo = {t, a};
 
-    reinsert(sol, conn, {-1, -1}, channelTo);
-    swap(unscheduled[ix], unscheduled.back());
-    unscheduled.pop_back();
+    reinsert(sol, unscheduled[ix].first, {-1, -1}, channelTo);
+    unscheduled[ix].second = true;
+    // swap(unscheduled[ix], unscheduled.back());
+    // unscheduled.pop_back();
   }
 }
 
@@ -1077,11 +1071,11 @@ bool stop(hrc::time_point from, double ub) {
 }
 
 #if defined(USE_VNS_PURE) || defined(USE_VNS_MATH_SOLVER) ||                   \
-    defined(USE_VRBSP_IP)
+    defined(USE_VRBSP_IP) || defined(USE_BRKGA)
 Solution multipleRepresentation(Solution ret) {
-  for (int ts_idx = 0; TimeSlot & ts : ret.slots) {
+  for (int ts_idx = 0; TimeSlot &ts : ret.slots) {
     vector<Channel> &chs = ts.channels;
-    for (int ix = 0; Channel & ch : ts.channels) {
+    for (int ix = 0; Channel &ch : ts.channels) {
       ch.in_solution = false;
       ch.parent = -1;
       memset(ch.child, -1, sizeof ch.child);
@@ -1163,7 +1157,7 @@ Solution CH_VRBSP() {
   for (int i = 0; i < N; i++)
     links.emplace_back(i);
 
-  shuffle(links.begin(), links.end(), whatever);
+  shuffle(links.begin(), links.end(), gen);
 
   for (int i = 0; i < N; ++i) {
     Solution tmp = ret;
@@ -1209,7 +1203,6 @@ Solution CH_VRBSP() {
 }
 
 double calcDP(Solution &sol, int t, int c, int depth) {
-  // printf("node %d %d %d\n", t, c, depth);
   sol(t, c).in_solution = true;
   double ret = sol(t, c).throughput;
 
@@ -1301,18 +1294,26 @@ Solution Solution::get_optimal_solution() {
   return ret;
 }
 
+vector<int> chs_wo_parents{24, 41, 42, 43, 44};
+
 double optimal_partitioning_global(Solution &multiple, bool compute_of) {
   if (compute_of)
     computeThroughput(multiple);
 
   multiple.throughput_ = 0.0;
 
-  for (int t = 0; t < multiple.slots.size(); ++t)
-    for (int c = 0; c < multiple.slots[t].channels.size(); ++c)
-      if (multiple(t, c).parent == -1) {
-        double ret = calcDP(multiple, t, c);
-        multiple.throughput_ += ret;
-      }
+  for (int t = 0; t < multiple.slots.size(); ++t) {
+    for (const int c : chs_wo_parents) {
+      double ret = calcDP(multiple, t, c);
+      multiple.throughput_ += ret;
+    }
+    // for (int c = 0; c < multiple.slots[t].channels.size(); ++c)
+    //   if (multiple(t, c).parent == -1) {
+    //     printf("channel %d\n", c);
+    //     double ret = calcDP(multiple, t, c);
+    //     multiple.throughput_ += ret;
+    //   }
+  }
 
   return multiple.throughput_;
 }
@@ -1946,4 +1947,51 @@ vector<string> gurobi_sol(const Solution &sol) {
   }
 
   return ans;
+}
+
+void from_json(const json &j, Instance &inst) {
+  j.at("N").get_to(inst.N);
+  j.at("alfa").get_to(inst.alfa);
+  j.at("NOI").get_to(inst.NOI);
+  j.at("powerSender").get_to(inst.powerSender);
+  j.at("receivers").get_to(inst.receivers);
+  j.at("senders").get_to(inst.senders);
+  j.at("AFF").get_to(inst.AFF);
+  j.at("DM").get_to(inst.DM);
+  j.at("DR").get_to(inst.DR);
+  j.at("SINR").get_to(inst.SINR);
+  j.at("B").get_to(inst.B);
+  j.at("GMM").get_to(inst.GMM);
+  j.at("overlap").get_to(inst.overlap);
+  j.at("BM").get_to(inst.BM);
+
+  inst.C_b.clear();
+  inst.C_b.reserve(j.at("C_b").size());
+  for (const auto &arr : j.at("C_b")) {
+    vector<int> tmp = arr.get<vector<int>>();
+    inst.C_b.emplace_back(tmp.begin(), tmp.end());
+  }
+}
+
+void to_json(json &j, const Instance &inst) {
+  j = json{{"N", inst.N},
+           {"alfa", inst.alfa},
+           {"NOI", inst.NOI},
+           {"powerSender", inst.powerSender},
+           {"receivers", inst.receivers},
+           {"senders", inst.senders},
+           {"AFF", inst.AFF},
+           {"DM", inst.DM},
+           {"DR", inst.DR},
+           {"SINR", inst.SINR},
+           {"B", inst.B},
+           {"GMM", inst.GMM},
+           {"overlap", inst.overlap},
+           {"BM", inst.BM}};
+
+  json c_b_json = json::array();
+  for (const auto &s : inst.C_b) {
+    c_b_json.push_back(vector<int>(s.begin(), s.end()));
+  }
+  j["C_b"] = c_b_json;
 }

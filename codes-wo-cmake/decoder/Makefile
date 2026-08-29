@@ -1,8 +1,8 @@
-OMP_PREFIX="/opt/homebrew/Cellar/libomp/20.1.3"
+OMP_PREFIX="/opt/homebrew/Cellar/libomp/21.1.4"
 JSON_PATH="./include/single_include"
 
 brkga: decoder.o
-	g++ -std=c++20 -c -L${OMP_PREFIX}/lib -I${OMP_PREFIX}/include -I../../include/ -I${JSON_PATH} HeuristicBRKGA.cpp
+	g++ -std=c++20 -c -I${OMP_PREFIX}/include -I../../include/ -I${JSON_PATH} HeuristicBRKGA.cpp
 	g++ -std=c++20 -o ./bin/decoder_brkga HeuristicBRKGA.o basic.o
 
 decoder.o:

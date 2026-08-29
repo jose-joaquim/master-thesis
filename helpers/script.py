@@ -16,11 +16,11 @@ shuffled_order = pl.int_range(1, 31, eager=True).shuffle(seed=seed).to_list()
 instances_backup = shuffled_instances
 
 order_backup = [
-    # 25,
-    # 7,
-    # 28,
-    # 19,
-    # 1,
+    25,
+    7,
+    28,
+    19,
+    1,
     # 5,
     # 29,
     # 15,
@@ -46,10 +46,10 @@ order_backup = [
     # 6,
     # 2,
     # 22,
-    31,
-    32,
-    33,
-    34,
+    # 31,
+    # 32,
+    # 33,
+    # 34,
 ]
 
 # for L in shuffled_instances:

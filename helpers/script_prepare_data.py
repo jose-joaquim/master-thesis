@@ -5,9 +5,9 @@ shuffled_instances = (2 ** pl.int_range(3, 12, eager=True).shuffle(seed=seed)).t
 
 dfs = {}
 for inst in shuffled_instances:
-    dfs[inst] = pl.read_csv(f"results/dr/U_{inst}/consolidated{inst}.csv").with_columns(
-        Group=pl.lit(inst)
-    )
+    dfs[inst] = pl.read_csv(
+        f"results/dr_backup/U_{inst}/consolidated{inst}.csv"
+    ).with_columns(Group=pl.lit(inst))
 
 concat = pl.concat(dfs.values())
 master = (
@@ -15,3 +15,5 @@ master = (
     .unpivot(index=["instance", "Group"], on=["ch", "vns", "brkga"])
     .rename({"value": "Result", "instance": "Instance", "variable": "Algorithm"})
 )
+
+breakpoint()

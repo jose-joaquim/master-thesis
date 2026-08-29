@@ -1,3 +1,7 @@
+#include "absl/log/globals.h"
+#include "absl/log/initialize.h"
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -8,7 +12,61 @@
 
 using namespace std;
 
+using mt3 = map<tuple<int, int, int>, GRBVar>;
+
 // -------------- variables --------------------
+
+void wls_var_x(GRBModel *model, mt3 &x) {
+  for (int i = 0; i < N; ++i)
+    for (int c = 0; c < C; ++c)
+      for (int t = 0; t < T; ++t)
+        x[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
+                                     "x" + to_string(i) + "," + to_string(c) +
+                                         "," + to_string(t));
+}
+
+void wls_var_z(GRBModel *model, mt3 &z) {
+  int cnt = 0;
+
+  for (int i = 0; i < N; i++)
+    for (int c = 0; c < C; ++c, ++cnt)
+      for (int t = 0; t < T; ++t)
+        z[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
+                                     "z" + to_string(i) + "," + to_string(c) +
+                                         "," + to_string(t));
+
+  printf("Created %d z_vars\n", cnt);
+}
+void wls_var_Iij(GRBModel *model, mt3 &Iij) {
+  int cnt = 0;
+
+  for (int i = 0; i < N; ++i)
+    for (int c = 0; c < C; ++c, ++cnt)
+      for (int t = 0; t < T; ++t)
+        Iij[{i, c, t}] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                                       "Iij" + to_string(i) + "," +
+                                           to_string(c) + "," + to_string(t));
+
+  printf("Created %d Iij_vars\n", cnt);
+}
+void wls_var_I(GRBModel *model, GRBVar *&I) {
+  I = new GRBVar[N];
+  int cnt = 0;
+
+  for (int i = 0; i < N; ++i, ++cnt)
+    I[i] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
+                         "I" + to_string(i));
+
+  printf("Created %d I_vars\n", cnt);
+}
+
+void wls_var_t(GRBModel *model, GRBVar *&t) {
+  t = new GRBVar[T];
+  for (int i = 0; i < T; ++i) {
+    string name = "t" + to_string(i);
+    t[i] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
+  }
+}
 
 // -------------- constraints ------------------
 
@@ -312,11 +370,11 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
     mt3 x, Iij, z;
     // variables
     printf("variables...\n");
-    var_x(model, x);
-    var_z(model, z);
-    var_Iij(model, Iij);
-    var_I(model, I);
-    var_t(model, t);
+    wls_var_x(model, x);
+    wls_var_z(model, z);
+    wls_var_Iij(model, Iij);
+    wls_var_I(model, I);
+    wls_var_t(model, t);
 
     auto stop = high_resolution_clock::now();
     duration<double> ms_double = stop - start;
@@ -342,8 +400,7 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
     cout << ms_double.count() << endl;
     // optimize
     model->update();
-    model->write("model.mps");
-    exit(0);
+    // model->write("model.mps");
 
     // for (const auto &idx : gurobi_sol(sol)) {
     //   if (fix)
@@ -356,11 +413,11 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
     model->set(GRB_DoubleParam_TimeLimit, 3600);
     model->set(GRB_DoubleParam_IntFeasTol, 1e-7);
 
-    string log_cb =
-        "./callback_log" + string(argv[1]) + "_" + string(argv[2]) + ".txt";
-    LogCallback cb = LogCallback(log_cb);
+    // string log_cb =
+    //     "./callback_log" + string(argv[1]) + "_" + string(argv[2]) + ".txt";
+    // LogCallback cb = LogCallback(log_cb);
 
-    model->setCallback(&cb);
+    // model->setCallback(&cb);
     model->optimize();
 
     if (model->get(GRB_IntAttr_Status) != GRB_INFEASIBLE) {
@@ -369,19 +426,19 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
 
       if (model->get(GRB_IntAttr_SolCount) > 0) {
         objVal = model->get(GRB_DoubleAttr_ObjVal);
-        model->write(argv[4]);
-        string res_sol =
-            "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
-        FILE *sol = fopen(res_sol.c_str(), "w");
-
-        for (auto &var : x) {
-          const auto &[i, c, t] = var.first;
-          if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
-            fprintf(sol, "%d %d %d %lf\n", i, c, t,
-                    var.second.get(GRB_DoubleAttr_X));
-        }
-
-        fclose(sol);
+        // model->write(argv[4]);
+        // string res_sol =
+        //     "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
+        // FILE *sol = fopen(res_sol.c_str(), "w");
+        //
+        // for (auto &var : x) {
+        //   const auto &[i, c, t] = var.first;
+        //   if (approximatelyEqual(var.second.get(GRB_DoubleAttr_X), 1.0))
+        //     fprintf(sol, "%d %d %d %lf\n", i, c, t,
+        //             var.second.get(GRB_DoubleAttr_X));
+        // }
+        //
+        // fclose(sol);
       }
 
       double dualObj = model->get(GRB_DoubleAttr_ObjBoundC);
@@ -389,8 +446,8 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
         dualObj = -1.0;
 
       FILE *result = fopen(res.c_str(), "a");
-      fprintf(result, "%s\t%lf\t%lf\t%lf\t%d\t%d\t%lf\t%lf\t%lf\n", argv[2],
-              objVal, dualObj, model->get(GRB_DoubleAttr_MIPGap),
+      fprintf(result, "%s,%lf,%lf,%lf,%d,%d,%lf,%lf,%lf\n", argv[2], objVal,
+              dualObj, model->get(GRB_DoubleAttr_MIPGap),
               model->get(GRB_IntAttr_NumVars),
               model->get(GRB_IntAttr_NumConstrs),
               model->get(GRB_DoubleAttr_DNumNZs),
@@ -414,27 +471,60 @@ double run(char **argv, bool pair, const Solution &sol, bool fix) {
 }
 
 int main(int argc, char **argv) {
-  cout << argv[1] << " " << argv[2] << " " << argv[3] << " " << argv[4] << endl;
-  freopen(argv[3], "r", stdin);
+  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+  absl::InitializeLog();
+  string input_path = absl::StrCat(argv[3], "/U_", argv[1], "/", "MD-VRBSP_U_",
+                                   argv[1], "_", argv[2], ".txt");
+
+  LOG(INFO) << "input path is " << input_path;
+
+  freopen(input_path.c_str(), "r", stdin);
   read_data();
 
-  cout << N << endl;
+  auto custom_receivers = vector<pair<double, double>>();
+  auto custom_senders = vector<pair<double, double>>();
+  for (int i = 0; i < N; ++i) {
+    custom_receivers.push_back({receivers[i][0], receivers[i][1]});
+    custom_senders.push_back({senders[i][0], senders[i][1]});
+  }
 
-  auto start = high_resolution_clock::now();
-  const Solution sol = CH_MDVRBSP();
-  T = sol.slots.size();
+  Instance my_inst{
+      .N = N,
+      .alfa = alfa,
+      .NOI = NOI,
+      .powerSender = powerSender,
+      .receivers = custom_receivers,
+      .senders = custom_senders,
+      .DR = DR,
+      .SINR = SINR,
+      .B = B,
+      .C_b = C_b,
+      .GMM = GMM,
+      .overlap = overlap,
+  };
 
-  cout << "uhu " << T << endl;
+  json converted;
+  to_json(converted, my_inst);
 
-  auto stop = high_resolution_clock::now();
-  duration<double> ms_double = stop - start;
-  cout << "ch " << ms_double.count() << endl;
+  std::ofstream o("pretty.json");
+  o << std::setw(4) << converted << std::endl;
+  o.close();
 
-  // FILE *ch_obj = fopen("ch_obj", "a");
-  // fprintf(ch_obj, "%s\t%u\t%lf\n", argv[2], T, ms_double.count());
-  // fclose(ch_obj);
-  // return 0;
-
-  double obj = run(argv, true, sol, true);
+  // auto start = high_resolution_clock::now();
+  // const Solution sol = CH_MDVRBSP();
+  // T = sol.slots.size();
+  //
+  // printf("CH o.f is %ud\n", T);
+  //
+  // auto stop = high_resolution_clock::now();
+  // duration<double> ms_double = stop - start;
+  // cout << "ch " << ms_double.count() << endl;
+  //
+  // // FILE *ch_obj = fopen("ch_obj", "a");
+  // // fprintf(ch_obj, "%s,%u,%lf\n", argv[2], T, ms_double.count());
+  // // fclose(ch_obj);
+  // // return 0;
+  //
+  // double obj = run(argv, true, sol, true);
   return 0;
 }

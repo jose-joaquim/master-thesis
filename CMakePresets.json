@@ -1,0 +1,117 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "debug-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "vns-pure-debug",
+      "displayName": "VNS Pure (Debug)",
+      "inherits": "debug-base",
+      "cacheVariables": {
+        "USE_VNS_PURE": "ON"
+      }
+    },
+    {
+      "name": "vns-pure-release",
+      "displayName": "VNS Pure (Release)",
+      "inherits": "release-base",
+      "cacheVariables": {
+        "USE_VNS_PURE": "ON"
+      }
+    },
+    {
+      "name": "vns-math-solver-debug",
+      "displayName": "VNS Math Solver (Debug)",
+      "inherits": "debug-base",
+      "cacheVariables": {
+        "USE_VNS_MATH_SOLVER": "ON"
+      }
+    },
+    {
+      "name": "vrbsp-ip-debug",
+      "displayName": "VRBSP IP (Debug)",
+      "inherits": "debug-base",
+      "cacheVariables": {
+        "USE_VRBSP_IP": "ON"
+      }
+    },
+    {
+      "name": "vrbsp-ip-release",
+      "displayName": "VRBSP IP (Release)",
+      "inherits": "release-base",
+      "cacheVariables": {
+        "USE_VRBSP_IP": "ON"
+      }
+    },
+    {
+      "name": "mdvrbsp-ip-debug",
+      "displayName": "MDVRBSP IP (Debug)",
+      "inherits": "debug-base",
+      "cacheVariables": {
+        "USE_MDVRBSP_IP": "ON"
+      }
+    },
+    {
+        "name": "brkga",
+        "displayName": "BRKGA (Debug)",
+        "inherits": "debug-base",
+        "cacheVariables": {
+            "USE_BRKGA": "ON"
+        }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vns-pure-debug",
+      "configurePreset": "vns-pure-debug"
+    },
+    {
+      "name": "vns-pure-release",
+      "configurePreset": "vns-pure-release"
+    },
+    {
+      "name": "vns-math-solver-debug",
+      "configurePreset": "vns-math-solver-debug"
+    },
+    {
+      "name": "vrbsp-ip-debug",
+      "configurePreset": "vrbsp-ip-debug"
+    },
+    {
+      "name": "vrbsp-ip-release",
+      "configurePreset": "vrbsp-ip-release"
+    },
+    {
+      "name": "mdvrbsp-ip-debug",
+      "configurePreset": "mdvrbsp-ip-debug"
+    },
+      {
+          "name": "brkga",
+          "configurePreset": "brkga"
+      }
+  ]
+}

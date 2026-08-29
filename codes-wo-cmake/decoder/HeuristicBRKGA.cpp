@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     bool written = false;
 
     Solution decoder;
-    MTRand rng;
+    MTRand rng(seed);
     BRKGA<Solution, MTRand> algorithm(n, p, pe, pm, rhoe, decoder, rng, K, MAXT);
 
     double TempoExecTotal = 0.0, TempoFO_Star = 0.0, FO_Star = 1000000007, FO_Min = -1000000007;

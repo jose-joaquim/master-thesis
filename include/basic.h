@@ -26,6 +26,8 @@ using hrc = std::chrono::high_resolution_clock;
 using dii = pair<double, pair<int, int>>;
 using misi = map<int, unordered_set<int>>;
 
+struct Instance;
+
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 #include "gurobi_c++.h"
 #endif
@@ -43,11 +45,28 @@ extern vector<vector<double>> DR, SINR, B;
 extern vector<unordered_set<int>> C_b;
 
 extern vector<double> GMM, BM;
-
-extern random_device rd;
-extern default_random_engine whatever;
-
+extern const uint32_t seed;
 extern vector<vector<int>> overlap;
+extern Instance instance;
+
+struct Instance {
+  int N;
+  double alfa;
+  double NOI;
+  double powerSender;
+  vector<pair<double, double>> receivers;
+  vector<pair<double, double>> senders;
+  vector<vector<double>> DR;
+  vector<vector<double>> SINR;
+  vector<vector<double>> B;
+  vector<unordered_set<int>> C_b;
+  vector<double> GMM;
+  vector<vector<int>> overlap;
+
+  vector<double> BM;
+  vector<pair<double, double>> AFF;
+  vector<pair<double, double>> DM;
+};
 
 struct Connection {
   int id;
@@ -128,6 +147,10 @@ public:
   Channel &operator()(int t, int c);
   Connection &operator()(int t, int c, int l);
 };
+
+void from_json(const json &, Instance &);
+
+void to_json(json &, const Instance &);
 
 void to_json(json &, const Solution &);
 

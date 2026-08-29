@@ -21,9 +21,15 @@ vector<Solution> vns() {
 
   int K_MUL = max(1, N / 100);
   int K_MAX = N;
+  bool needs_update = false;
+  Solution candidate = inc_20;
   while (!stop(start, MAX_TIME)) {
     int k = 1;
-    Solution candidate = inc_20;
+    if (needs_update) {
+      candidate = inc_20;
+      needs_update = false;
+    }
+
     while (!stop(start, MAX_TIME) && k <= K_MAX) {
       candidate = perturbation(candidate, k * K_MUL);
       candidate = local_search(candidate);
@@ -31,6 +37,7 @@ vector<Solution> vns() {
       if (candidate > inc_20) {
         k = 1;
         inc_20 = candidate;
+        needs_update = true;
         printf("%.4lf,%.4lf\n", inc_20.throughput_, elapsed_time(start));
       } else
         k += 1;
