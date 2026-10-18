@@ -1,15 +1,13 @@
 #ifndef MASTER_BASIC_H_
 #define MASTER_BASIC_H_
 
-#include <algorithm>
+#include "absl/flags/declare.h"
 #include <cassert>
 #include <chrono>
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <nlohmann/json.hpp>
-#include <random>
-#include <set>
-#include <tuple>
 #include <unordered_set>
 #include <vector>
 
@@ -27,6 +25,19 @@ using dii = pair<double, pair<int, int>>;
 using misi = map<int, unordered_set<int>>;
 
 struct Instance;
+class Solution;
+
+extern unordered_map<string, function<double(const vector<double> &)>>
+    algorithm_mapping;
+
+ABSL_DECLARE_FLAG(std::string, ACTIVE_DECODER);
+
+double decoder_mic(const vector<double> &);
+double decoder_dp(const vector<double> &);
+double decoder_gcsid(const vector<double> &);
+double decoder_gcsid_plus(const vector<double> &);
+double decoder_gcsid_greedy(const vector<double> &);
+double decoder_local_search(const vector<double> &);
 
 #if defined(USE_MATH_SOLVER) || defined(USE_VRBSP_IP) || defined(USE_MDVRBSP_IP)
 #include "gurobi_c++.h"

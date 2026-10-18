@@ -12,9 +12,6 @@ namespace fs = std::filesystem;
 
 int numberVariables;
 
-ABSL_FLAG(
-    int, type, 0,
-    "Decoder/heuristic type: Classic - 0 | Classic DP - 1 | Fixed DP - 2");
 ABSL_FLAG(double, maximum_time, 0.0, "Maximum execution time (seconds).");
 
 ABSL_FLAG(bool, first, true,
@@ -126,7 +123,7 @@ int main(int argc, char **argv) {
   absl::InitializeLog();
   absl::ParseCommandLine(argc, argv);
 
-  type = absl::GetFlag(FLAGS_type);
+  // type = absl::GetFlag(FLAGS_type);
   maximumTime = absl::GetFlag(FLAGS_maximum_time);
 
   first = absl::GetFlag(FLAGS_first);
