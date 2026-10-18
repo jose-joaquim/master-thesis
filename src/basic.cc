@@ -630,164 +630,332 @@ double buildVRBSPSolution(vector<double> variables, vector<int> permutation,
   return -1.0 * sol.throughput_;
 }
 
-double decoder_mic(const vector<double> &) { return 0; }
-double decoder_dp(const vector<double> &) { return 0; }
+// =====================================================================
+// Shared helpers
+// =====================================================================
 
-// ---------------------------------- GCSID begin ----------
-// void insertInBestChannel(Solution &sol, int idConnection,
-//                          vector<double> &variables) {
-//   double currentThroughput = sol.throughput, bestThroughput = sol.throughput;
-//   bool inserted = false, splited = false, created = false;
-//   Channel top, left, right, toBeCreated;
-//   vector<int> tsc(3, -1);
-//
-//   for (int t = 0; t < sol.slots.size(); t++) {
-//     for (int s = 0; s < sol.slots[t].spectrums.size(); s++) {
-//       int freeSpec = sol.slots[t].spectrums[s].maxFrequency -
-//                      sol.slots[t].spectrums[s].usedFrequency;
-//       if (freeSpec >= 160)
-//         freeSpec = 160;
-//       else if (freeSpec >= 80)
-//         freeSpec = 80;
-//       else if (freeSpec >= 40)
-//         freeSpec = 40;
-//
-//       if (freeSpec != 0) {
-//         Channel temp(freeSpec);
-//         temp = insertInChannel(temp, idConnection);
-//         double aux_temp = currentThroughput + temp.throughput;
-//
-//         if (aux_temp > bestThroughput) {
-//           created = true;
-//           splited = false;
-//           inserted = false;
-//           bestThroughput = aux_temp;
-//           toBeCreated = temp;
-//           tsc = {t, s, -1};
-//         }
-//       }
-//
-//       for (int c = 0; c < sol.slots[t].spectrums[s].channels.size(); c++) {
-//         Channel toInsert = insertInChannel(
-//             sol.slots[t].spectrums[s].channels[c], idConnection);
-//         double aux = (currentThroughput -
-//                       sol.slots[t].spectrums[s].channels[c].throughput) +
-//                      toInsert.throughput;
-//         if (aux > bestThroughput) {
-//           splited = false;
-//           bestThroughput = aux;
-//           top = toInsert;
-//           inserted = true;
-//           tsc = {t, s, c};
-//         }
-//
-//         if (toInsert.bandwidth == 20)
-//           continue;
-//
-//         double newBand = toInsert.bandwidth / 2.0;
-//         Channel temp1(newBand), temp2(newBand);
-//
-//         // Divide primeiro: particiona apenas os membros que JA estavam
-//         // no canal. A divisao nao depende do link que esta entrando.
-//         vector<int> connection_ids;
-//         for (const auto &conn :
-//              sol.slots[t].spectrums[s].channels[c].connections)
-//           connection_ids.pb(conn.id);
-//
-//         int n_conn = connection_ids.size();
-//         MTRand &generator = decoderRng();
-//         for (int i = n_conn - 1; i > 0; --i) {
-//           int j = generator.randInt(i);
-//           std::swap(connection_ids[i], connection_ids[j]);
-//         }
-//
-//         for (int i = 0; i < n_conn; i++) {
-//           if (i % 2 == 0)
-//             temp1 = insertInChannel(temp1, connection_ids[i]);
-//           else
-//             temp2 = insertInChannel(temp2, connection_ids[i]);
-//         }
-//
-//         // Só agora testa em qual das metades o link novo rende mais.
-//         Channel cand1 = insertInChannel(temp1, idConnection);
-//         Channel cand2 = insertInChannel(temp2, idConnection);
-//
-//         double opt1 = cand1.throughput + temp2.throughput;
-//         double opt2 = temp1.throughput + cand2.throughput;
-//
-//         double newAux = (currentThroughput -
-//                          sol.slots[t].spectrums[s].channels[c].throughput) +
-//                         (opt1 >= opt2 ? opt1 : opt2);
-//         if (newAux > bestThroughput) {
-//           splited = true;
-//           inserted = true;
-//           bestThroughput = newAux;
-//           if (opt1 >= opt2) {
-//             left = cand1;
-//             right = temp2;
-//           } else {
-//             left = temp1;
-//             right = cand2;
-//           }
-//           tsc = {t, s, c};
-//         }
-//       }
-//     }
-//   }
-//
-//   if (inserted && !splited) {
-//     sol.throughput = bestThroughput;
-//     sol.slots[tsc[0]].spectrums[tsc[1]].channels[tsc[2]] = top;
-//   } else if (inserted && splited) {
-//     sol.throughput = bestThroughput;
-//     sol.slots[tsc[0]].spectrums[tsc[1]].channels.erase(
-//         sol.slots[tsc[0]].spectrums[tsc[1]].channels.begin() + tsc[2]);
-//     sol.slots[tsc[0]].spectrums[tsc[1]].channels.push_back(left);
-//     sol.slots[tsc[0]].spectrums[tsc[1]].channels.push_back(right);
-//   } else if (created) {
-//     sol.throughput = bestThroughput;
-//     sol.slots[tsc[0]].spectrums[tsc[1]].channels.push_back(toBeCreated);
-//     sol.slots[tsc[0]].spectrums[tsc[1]].usedFrequency +=
-//     toBeCreated.bandwidth;
-//   }
-// }
-// ---------------------------------- GCSID ends  ----------
-
-double decoder_gcsid(const vector<double> &) {
-  // double totalSpectrum = 500.0, totalUsed = 0.0;
-  // int i = 0;
-  //
-  // while (i < (int)links.size() && totalUsed < totalSpectrum) {
-  //   int connection = links[i][1] / 2;
-  //   insertInBestChannel(sol, connection, variables);
-  //   i++;
-  // }
-  //
-  // // sol = applyFusion(sol);
-  return 0;
-}
-
-double decoder_gcsid_plus(const vector<double> &) { return 0; }
-double decoder_gcsid_greedy(const vector<double> &) { return 0; }
-double decoder_local_search(const vector<double> &) { return 0; }
-
-double Solution::decode(std::vector<double> variables) const {
+// Rebuilds the insertion-order permutation from the odd/k1 genes of the
+// chromosome: (k1_0, k2_0, k1_1, k2_1, ...). Every decoder needs this,
+// only MIC/DP additionally read the k2 genes (bandwidth).
+static vector<int> build_permutation(const vector<double> &variables) {
   vector<pair<double, int>> ranking;
-  for (int i = 0; i < variables.size(); i += 2)
+  for (int i = 0; i < (int)variables.size(); i += 2)
     ranking.emplace_back(variables[i], i);
-
   sort(ranking.begin(), ranking.end());
 
   vector<int> permutation;
-  for (int i = 0; i < ranking.size(); i++)
-    permutation.emplace_back(ranking[i].second);
-
-  std::string decoder_flag = absl::GetFlag(FLAGS_ACTIVE_DECODER);
-  double fitness_ = algorithm_mapping[decoder_flag](variables);
-
-  double fitness = buildVRBSPSolution(variables, permutation);
-  return fitness;
+  permutation.reserve(ranking.size());
+  for (auto &pr : ranking)
+    permutation.push_back(pr.second);
+  return permutation;
 }
+
+// Throughput a channel would have with `extra` inserted, without mutating it.
+static double priceInsertion(const Channel &ch, int extra) {
+  double total = 0.0, extraInterference = 0.0;
+  for (const auto &conn : ch.connections) {
+    Connection c = conn;
+    c.interference += AFF[conn.id][extra];
+    total += computeConnectionThroughput(c, ch.bandwidth);
+    extraInterference += AFF[extra][conn.id];
+  }
+  Connection tmp(extra);
+  tmp.interference = extraInterference;
+  total += computeConnectionThroughput(tmp, ch.bandwidth);
+  return total;
+}
+
+// =====================================================================
+// decoder_mic : k1 (order) + k2 (bandwidth), classic MIC construction.
+// =====================================================================
+
+double decoder_mic(const vector<double> &variables) {
+  vector<int> permutation = build_permutation(variables);
+  vector<double> vars_copy = variables;
+
+  TimeSlot init(vector<Channel>{});
+  init.used_bw = 0.0;
+  Solution sol(vector<TimeSlot>{init});
+
+  int totalSpectrum = 500, used_bw = 0, idx = 0;
+  while (idx < (int)permutation.size() && used_bw < totalSpectrum) {
+    int connection = permutation[idx] / 2;
+    int bandWidth = convertChromoBandwidth(vars_copy[permutation[idx] + 1]);
+    used_bw += insertFreeChannel(sol, connection, bandWidth, vars_copy);
+    idx += 1;
+  }
+
+  computeThroughput(sol);
+
+  while (idx < (int)permutation.size()) {
+    int connection = permutation[idx] / 2;
+    int bandWidth = convertChromoBandwidth(vars_copy[permutation[idx] + 1]);
+    insertBestChannel(sol, connection, bandWidth, vars_copy);
+    idx += 1;
+  }
+
+  fix_channels(sol);
+  return -1.0 * sol.throughput_;
+}
+
+// =====================================================================
+// decoder_dp : MIC construction + exact DP re-partitioning (k1 + k2).
+// =====================================================================
+
+double decoder_dp(const vector<double> &variables) {
+  vector<int> permutation = build_permutation(variables);
+  return buildVRBSPSolution(variables, permutation, nullopt);
+}
+
+// =====================================================================
+// GCSID family : k1 (order) only. Bandwidth is decided procedurally via
+// create/join/split comparison. k2 genes are unused, matching m3sp.
+// =====================================================================
+
+enum class GcsidPlacement { None, Create, Join, Split };
+
+template <class PartitionFn>
+static void insertInBestChannelGcsidImpl(Solution &sol, int idConnection,
+                                         PartitionFn partition) {
+  TimeSlot &ts = sol(0);
+
+  double usedBw = 0.0;
+  for (const auto &ch : ts.channels)
+    usedBw += ch.bandwidth;
+
+  int freeSpec = 500 - (int)usedBw;
+  if (freeSpec >= 160)
+    freeSpec = 160;
+  else if (freeSpec >= 80)
+    freeSpec = 80;
+  else if (freeSpec >= 40)
+    freeSpec = 40;
+  else if (freeSpec >= 20)
+    freeSpec = 20;
+  else
+    freeSpec = 0;
+
+  double currentThroughput = sol.throughput_, bestThroughput = sol.throughput_;
+  GcsidPlacement best = GcsidPlacement::None;
+  int bestC = -1, createBand = 0;
+  Channel leftChannel, rightChannel;
+
+  if (freeSpec != 0) {
+    Connection tmp(idConnection);
+    double thr = computeConnectionThroughput(tmp, freeSpec);
+    if (currentThroughput + thr > bestThroughput) {
+      best = GcsidPlacement::Create;
+      bestThroughput = currentThroughput + thr;
+      createBand = freeSpec;
+    }
+  }
+
+  for (int c = 0; c < (int)ts.channels.size(); ++c) {
+    Channel &ch = ts.channels[c];
+    double without = currentThroughput - ch.throughput;
+
+    double joinedThr = priceInsertion(ch, idConnection);
+    if (without + joinedThr > bestThroughput) {
+      best = GcsidPlacement::Join;
+      bestThroughput = without + joinedThr;
+      bestC = c;
+    }
+
+    if (ch.bandwidth == 20)
+      continue;
+
+    vector<int> ids;
+    ids.reserve(ch.connections.size());
+    for (const auto &conn : ch.connections)
+      ids.push_back(conn.id);
+
+    Channel a(ch.bandwidth / 2, {}), b(ch.bandwidth / 2, {});
+    partition(ids, a, b);
+
+    optional<Channel> cand1 = insertInChannel(a, idConnection, true);
+    optional<Channel> cand2 = insertInChannel(b, idConnection, true);
+    if (!cand1 || !cand2)
+      continue;
+
+    double opt1 = cand1->throughput + b.throughput;
+    double opt2 = a.throughput + cand2->throughput;
+    double newThr = without + max(opt1, opt2);
+
+    if (newThr > bestThroughput) {
+      best = GcsidPlacement::Split;
+      bestThroughput = newThr;
+      bestC = c;
+      if (opt1 >= opt2) {
+        leftChannel = *cand1;
+        rightChannel = b;
+      } else {
+        leftChannel = a;
+        rightChannel = *cand2;
+      }
+    }
+  }
+
+  if (best == GcsidPlacement::None)
+    return;
+
+  sol.throughput_ = bestThroughput;
+  if (best == GcsidPlacement::Create) {
+    Channel nc(createBand, {});
+    nc = *insertInChannel(nc, idConnection, true);
+    ts.channels.push_back(nc);
+  } else if (best == GcsidPlacement::Join) {
+    ts.channels[bestC] =
+        *insertInChannel(ts.channels[bestC], idConnection, true);
+  } else {
+    ts.channels.erase(ts.channels.begin() + bestC);
+    ts.channels.push_back(leftChannel);
+    ts.channels.push_back(rightChannel);
+  }
+}
+
+// Shuffle-and-alternate partition (classic GCSID / GCSID+).
+static void alternatePartition(vector<int> &ids, Channel &a, Channel &b) {
+  shuffle(ids.begin(), ids.end(), gen);
+  for (int k = 0; k < (int)ids.size(); ++k) {
+    Channel &dst = (k % 2 == 0) ? a : b;
+    dst = *insertInChannel(dst, ids[k], true);
+  }
+}
+
+// Greedy partition: each existing member goes to whichever half gains more.
+static void greedyPartition(vector<int> &ids, Channel &a, Channel &b) {
+  shuffle(ids.begin(), ids.end(), gen);
+  for (int id : ids) {
+    optional<Channel> insA = insertInChannel(a, id, true);
+    optional<Channel> insB = insertInChannel(b, id, true);
+    double gainA = insA ? insA->throughput - a.throughput : -1e18;
+    double gainB = insB ? insB->throughput - b.throughput : -1e18;
+    if (gainA >= gainB)
+      a = *insA;
+    else
+      b = *insB;
+  }
+}
+
+static double runGcsidDecoder(const vector<double> &variables,
+                              void (*partition)(vector<int> &, Channel &,
+                                                Channel &)) {
+  vector<int> permutation = build_permutation(variables);
+  TimeSlot init(vector<Channel>{});
+  Solution sol(vector<TimeSlot>{init});
+
+  for (int idx : permutation)
+    insertInBestChannelGcsidImpl(sol, idx / 2, partition);
+
+  return -1.0 * sol.throughput_;
+}
+
+double decoder_gcsid(const vector<double> &variables) {
+  return runGcsidDecoder(variables, alternatePartition);
+}
+
+// GCSID+ is algorithmically identical to GCSID (the "+" in m3sp is only an
+// incremental-bookkeeping optimization for speed, not a different result).
+double decoder_gcsid_plus(const vector<double> &variables) {
+  return runGcsidDecoder(variables, alternatePartition);
+}
+
+double decoder_gcsid_greedy(const vector<double> &variables) {
+  return runGcsidDecoder(variables, greedyPartition);
+}
+
+// =====================================================================
+// decoder_local_search : same k1-only construction as GCSID, followed by
+// a relocate-sweep local search until no improving single-link move
+// remains. k2 genes are unused here too (matches runLocalSearch, which
+// builds with insertInBestChannel and ignores the variables it's given).
+// =====================================================================
+
+static bool relocateSweep(Solution &sol) {
+  bool any = false;
+  TimeSlot &ts = sol(0);
+
+  vector<int> ids;
+  for (const auto &ch : ts.channels)
+    for (const auto &c : ch.connections)
+      ids.push_back(c.id);
+
+  for (int id : ids) {
+    int srcIdx = -1;
+    for (int c = 0; c < (int)ts.channels.size() && srcIdx < 0; ++c)
+      for (const auto &conn : ts.channels[c].connections)
+        if (conn.id == id) {
+          srcIdx = c;
+          break;
+        }
+
+    if (srcIdx < 0 || ts.channels[srcIdx].connections.size() <= 1)
+      continue;
+
+    Channel &src = ts.channels[srcIdx];
+    optional<Channel> newSrc = deleteFromChannel(src, id);
+    if (!newSrc)
+      continue;
+
+    double bestDelta = EPS;
+    int bestIdx = -1;
+    Channel bestDst;
+
+    for (int c = 0; c < (int)ts.channels.size(); ++c) {
+      if (c == srcIdx)
+        continue;
+
+      optional<Channel> newDst = insertInChannel(ts.channels[c], id, true);
+      if (!newDst)
+        continue;
+
+      double delta = (newSrc->throughput + newDst->throughput) -
+                     (src.throughput + ts.channels[c].throughput);
+      if (delta > bestDelta) {
+        bestDelta = delta;
+        bestIdx = c;
+        bestDst = *newDst;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      ts.channels[srcIdx] = *newSrc;
+      ts.channels[bestIdx] = bestDst;
+      any = true;
+    }
+  }
+
+  return any;
+}
+
+double decoder_local_search(const vector<double> &variables) {
+  vector<int> permutation = build_permutation(variables);
+
+  TimeSlot init(vector<Channel>{});
+  Solution sol(vector<TimeSlot>{init});
+
+  // Same construction as decoder_gcsid: k1 only, bandwidth decided
+  // internally via create/join/split comparison.
+  for (int idx : permutation)
+    insertInBestChannelGcsidImpl(sol, idx / 2, alternatePartition);
+
+  while (relocateSweep(sol))
+    computeThroughput(sol);
+
+  return -1.0 * sol.throughput_;
+}
+
+// =====================================================================
+// Solution::decode : dispatches to whichever decoder is active. No need
+// to compute a permutation here — each decoder builds its own via
+// build_permutation(variables), reading k2 only when relevant.
+// =====================================================================
+
+double Solution::decode(std::vector<double> variables) const {
+  std::string decoder_flag = absl::GetFlag(FLAGS_ACTIVE_DECODER);
+  return algorithm_mapping[decoder_flag](variables);
+}
+
 #endif
 
 #if defined(USE_MDVRBSP_IP)
