@@ -9,6 +9,7 @@ option(USE_VRBSP_IP "VRBSP integer program" OFF)
 option(USE_MDVRBSP_IP "MDVRBSP integer program" OFF)
 option(USE_MVRBSP_COL_GEN "MDVRBSP with column geneneration" OFF)
 option(USE_BRKGA "MDVRBSP with column geneneration" OFF)
+option(USE_JSON_CONVERTER "Build legacy-txt -> JSON instance converter" OFF)
 
 if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_VNS_PURE
@@ -16,7 +17,8 @@ if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_MDVRBSP_IP
    AND NOT USE_MDVRBSP_COL_GEN
    AND NOT USE_VRBSP_COL_GEN
-   AND NOT USE_BRKGA)
+   AND NOT USE_BRKGA
+   AND NOT USE_JSON_CONVERTER)
   message(FATAL_ERROR "You need to select an option!")
 endif()
 
@@ -121,4 +123,13 @@ elseif(USE_BRKGA)
   add_executable(brkga_decoder "./src/brkga_decoder.cc")
   target_link_libraries(brkga_decoder brkga basic mtrand
                         nlohmann_json::nlohmann_json ${OMP_LIBRARY})
+elseif(USE_BRKGA)
+  target_compile_definitions(basic PUBLIC USE_BRKGA)
+
+  add_executable(brkga_decoder "./src/brkga_decoder.cc")
+  target_link_libraries(brkga_decoder brkga basic mtrand
+                        nlohmann_json::nlohmann_json ${OMP_LIBRARY})
+elseif(USE_JSON_CONVERTER)
+  add_executable(convert_to_json "./tools/convert_to_json.cc")
+  target_link_libraries(convert_to_json basic nlohmann_json::nlohmann_json)
 endif()

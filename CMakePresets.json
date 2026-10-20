@@ -82,7 +82,15 @@
         "cacheVariables": {
             "USE_BRKGA": "ON"
         }
-    }
+    },
+    {
+        "name": "json-converter",
+        "displayName": "JSON Converter (Debug)",
+        "inherits": "debug-base",
+        "cacheVariables": {
+          "USE_JSON_CONVERTER": "ON"
+        }
+    },
   ],
   "buildPresets": [
     {
@@ -109,9 +117,13 @@
       "name": "mdvrbsp-ip-debug",
       "configurePreset": "mdvrbsp-ip-debug"
     },
-      {
-          "name": "brkga",
-          "configurePreset": "brkga"
-      }
+    {
+       "name": "brkga",
+       "configurePreset": "brkga"
+    },
+    {
+       "name": "json-converter",
+       "configurePreset": "json-converter"
+    },
   ]
 }
