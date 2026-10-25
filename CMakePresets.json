@@ -90,7 +90,7 @@
         "cacheVariables": {
           "USE_JSON_CONVERTER": "ON"
         }
-    },
+    }
   ],
   "buildPresets": [
     {
@@ -124,6 +124,6 @@
     {
        "name": "json-converter",
        "configurePreset": "json-converter"
-    },
+    }
   ]
 }

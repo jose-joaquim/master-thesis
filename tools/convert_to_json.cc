@@ -1,6 +1,7 @@
 #include "basic.h"
 #include <fstream>
 #include <iostream>
+#include <set>
 
 // Pull in globals populated by read_data()
 extern int N, T;

@@ -244,7 +244,7 @@ def average_spec_qtd(nConnections, gamma, dataRates):
 def initialize():
     load_overlap()
 
-    U_n = 1024
+    U_n = 8
     receivers = [[0 for i in range(2)] for _ in range(U_n)]
     senders = [[0 for i in range(2)] for _ in range(U_n)]
     DR = [[0 for i in range(4)] for _ in range(12)]
@@ -265,6 +265,22 @@ def initialize():
         DM,
         AFF,
     )
+
+    import json
+
+    instance = {
+        "N": N,
+        "noise": NOI,
+        "power_sender": PS,
+        "receivers": receivers,
+        "senders": senders,
+        "data_rates": DR,
+        "SINR": SINR,
+    }
+    with open(f"{sys.argv[1]}.json", "w") as f:
+        json.dump(instance, f, indent=2)
+
+    sys.exit(1)
 
     # nConnections, time-slots, SINR, power_sender, noise, beta, intermatrix, distancematrix, affectance, datarates, inst, version
     return N, NTS, SINR, PS, NOI, B, IM, DM, AFF, DR, gamma
