@@ -14,7 +14,7 @@ int numberVariables;
 
 ABSL_FLAG(double, maximum_time, 0.0, "Maximum execution time (seconds).");
 
-ABSL_FLAG(bool, first, true,
+ABSL_FLAG(bool, first, false,
           "Whether this is the first run (controls one-time output "
           "directory cleanup).");
 
@@ -57,13 +57,9 @@ void init(const std::string &instancePath, FILE **solutionFile,
           FILE **objectivesFile, FILE **timeFile, FILE **populationFile,
           FILE **channelsFile) {
   LOG(INFO) << "Loading instance from " << instancePath;
-  std::ifstream input_json_path(instancePath);
-  json input_json;
-  input_json_path >> input_json;
-  Instance inst;
-  from_json(input_json, inst);
+  load_instance(instancePath);
 
-  numberVariables = 2 * inst.N;
+  numberVariables = 2 * instance.N;
 
   string outputDir;
 
@@ -71,17 +67,17 @@ void init(const std::string &instancePath, FILE **solutionFile,
   oss << (pe * 100);
   string aux = oss.str();
   if (type == 0)
-    outputDir = "../output/output_" + aux + '/' + to_string(inst.N);
+    outputDir = "../output/output_" + aux + '/' + to_string(instance.N);
   else if (type == 1 || type == 4)
-    outputDir = "../output/output_dp_" + aux + '/' + to_string(inst.N);
+    outputDir = "../output/output_dp_" + aux + '/' + to_string(instance.N);
   else if (type == 3)
-    outputDir = "../output/output_random_dp_" + aux + '/' + to_string(inst.N);
+    outputDir = "../output/output_random_dp_" + aux + '/' + to_string(instance.N);
   else if (type == 5)
     outputDir =
-        "../output/output_new_heuristic_2_" + aux + '/' + to_string(inst.N);
+        "../output/output_new_heuristic_2_" + aux + '/' + to_string(instance.N);
   else if (type == 6)
     outputDir =
-        "../output/output_local_search_" + aux + '/' + to_string(inst.N);
+        "../output/output_local_search_" + aux + '/' + to_string(instance.N);
 
   try {
     if (fs::exists(outputDir) && first) {
@@ -121,7 +117,11 @@ void init(const std::string &instancePath, FILE **solutionFile,
 int main(int argc, char **argv) {
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
   absl::InitializeLog();
-  absl::ParseCommandLine(argc, argv);
+  auto args = absl::ParseCommandLine(argc, argv);
+  if (args.size() != 2) {
+    fprintf(stderr, "usage: %s <instance.json> [flags]\n", argv[0]);
+    return 1;
+  }
 
   // type = absl::GetFlag(FLAGS_type);
   maximumTime = absl::GetFlag(FLAGS_maximum_time);
@@ -144,6 +144,9 @@ int main(int argc, char **argv) {
   bool applyEliteLS = (type == 6) && USE_ELITE_LS;
   FILE *solutionFile = nullptr, *objectivesFile = nullptr, *timeFile = nullptr,
        *populationFile = nullptr, *channelsFile = nullptr;
+
+    init(args[1], &solutionFile, &objectivesFile, &timeFile, &populationFile,
+      &channelsFile);
 
   // evaluations = 0;
   const unsigned n = numberVariables;

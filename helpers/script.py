@@ -4,7 +4,8 @@ import os
 
 vns_program_path = "./build/vns_pure"
 brkga_program_path = "./codes-wo-cmake/decoder/bin/decoder_brkga"
-prefix_instance = "./instances/dr/U_{}/MD-VRBSP_U_{}_{}.txt"
+prefix_instance = "./instances/dr/U_{}/MD-VRBSP_U_{}_{}.json"
+legacy_prefix_instance = "./instances/dr/U_{}/MD-VRBSP_U_{}_{}.txt"
 prefix_result = "results/dr/U_{}"
 seed = 1
 
@@ -65,6 +66,7 @@ for L in instances_backup:
     for i in order_backup:
         print(f"Running for {L}_{i}")
         instance_path = prefix_instance.format(L, L, i)
+        legacy_instance_path = legacy_prefix_instance.format(L, L, i)
         ch_json = f"{output_path}/solutionCH{L}_{i}.json"
         vns_json = f"{output_path}/solutionVNS{L}_{i}.json"
         brkga_json = f"{output_path}/solutionBRKGA{L}_{i}.json"
@@ -90,7 +92,7 @@ for L in instances_backup:
         df.write_csv(f"{output_path}/progress{L}_{i}.csv")
 
         run = subprocess.run(
-            [brkga_program_path, instance_path, brkga_json, brkga_partial],
+            [brkga_program_path, legacy_instance_path, brkga_json, brkga_partial],
             capture_output=True,
             text=True,
             cwd="./",

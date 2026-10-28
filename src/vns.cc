@@ -19,8 +19,8 @@ vector<Solution> vns() {
 
   Solution inc_20 = convertTo20MhzSol(inc);
 
-  int K_MUL = max(1, N / 100);
-  int K_MAX = N;
+  int K_MUL = max(1, instance.N / 100);
+  int K_MAX = instance.N;
   bool needs_update = false;
   Solution candidate = inc_20;
   while (!stop(start, MAX_TIME)) {
@@ -60,8 +60,7 @@ vector<Solution> vns() {
 }
 
 int main(int argc, char **argv) {
-  freopen(argv[1], "r", stdin);
-  read_data();
+  load_instance(argv[1]);
 
   vector<Solution> ans = vns();
 

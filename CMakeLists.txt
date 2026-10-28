@@ -9,7 +9,6 @@ option(USE_VRBSP_IP "VRBSP integer program" OFF)
 option(USE_MDVRBSP_IP "MDVRBSP integer program" OFF)
 option(USE_MVRBSP_COL_GEN "MDVRBSP with column geneneration" OFF)
 option(USE_BRKGA "MDVRBSP with column geneneration" OFF)
-option(USE_JSON_CONVERTER "Build legacy-txt -> JSON instance converter" OFF)
 
 if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_VNS_PURE
@@ -17,8 +16,7 @@ if(NOT USE_VNS_MATH_SOLVER
    AND NOT USE_MDVRBSP_IP
    AND NOT USE_MDVRBSP_COL_GEN
    AND NOT USE_VRBSP_COL_GEN
-   AND NOT USE_BRKGA
-   AND NOT USE_JSON_CONVERTER)
+  AND NOT USE_BRKGA)
   message(FATAL_ERROR "You need to select an option!")
 endif()
 
@@ -81,7 +79,7 @@ if(USE_VNS_MATH_SOLVER
   target_include_directories(basic PUBLIC "${GUROBI_INCLUDE_DIRS}")
   target_link_libraries(basic ${GUROBI_CXX_LIBRARY} ${GUROBI_LIBRARY})
   target_link_libraries(basic nlohmann_json::nlohmann_json absl::log
-                        absl::log_initialize)
+                        absl::log_initialize absl::flags absl::flags_parse)
 else()
   target_link_libraries(
     basic
@@ -129,7 +127,4 @@ elseif(USE_BRKGA)
   add_executable(brkga_decoder "./src/brkga_decoder.cc")
   target_link_libraries(brkga_decoder brkga basic mtrand
                         nlohmann_json::nlohmann_json ${OMP_LIBRARY})
-elseif(USE_JSON_CONVERTER)
-  add_executable(convert_to_json "./tools/convert_to_json.cc")
-  target_link_libraries(convert_to_json basic nlohmann_json::nlohmann_json)
 endif()

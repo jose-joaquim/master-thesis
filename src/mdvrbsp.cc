@@ -17,9 +17,9 @@ using mt3 = map<tuple<int, int, int>, GRBVar>;
 // -------------- variables --------------------
 
 void wls_var_x(GRBModel *model, mt3 &x) {
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c)
-      for (int t = 0; t < T; ++t)
+      for (int t = 0; t < instance.T; ++t)
         x[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
                                      "x" + to_string(i) + "," + to_string(c) +
                                          "," + to_string(t));
@@ -28,9 +28,9 @@ void wls_var_x(GRBModel *model, mt3 &x) {
 void wls_var_z(GRBModel *model, mt3 &z) {
   int cnt = 0;
 
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < instance.N; i++)
     for (int c = 0; c < C; ++c, ++cnt)
-      for (int t = 0; t < T; ++t)
+      for (int t = 0; t < instance.T; ++t)
         z[{i, c, t}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
                                      "z" + to_string(i) + "," + to_string(c) +
                                          "," + to_string(t));
@@ -40,9 +40,9 @@ void wls_var_z(GRBModel *model, mt3 &z) {
 void wls_var_Iij(GRBModel *model, mt3 &Iij) {
   int cnt = 0;
 
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c, ++cnt)
-      for (int t = 0; t < T; ++t)
+      for (int t = 0; t < instance.T; ++t)
         Iij[{i, c, t}] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                                        "Iij" + to_string(i) + "," +
                                            to_string(c) + "," + to_string(t));
@@ -50,10 +50,10 @@ void wls_var_Iij(GRBModel *model, mt3 &Iij) {
   printf("Created %d Iij_vars\n", cnt);
 }
 void wls_var_I(GRBModel *model, GRBVar *&I) {
-  I = new GRBVar[N];
+  I = new GRBVar[instance.N];
   int cnt = 0;
 
-  for (int i = 0; i < N; ++i, ++cnt)
+  for (int i = 0; i < instance.N; ++i, ++cnt)
     I[i] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                          "I" + to_string(i));
 
@@ -61,8 +61,8 @@ void wls_var_I(GRBModel *model, GRBVar *&I) {
 }
 
 void wls_var_t(GRBModel *model, GRBVar *&t) {
-  t = new GRBVar[T];
-  for (int i = 0; i < T; ++i) {
+  t = new GRBVar[instance.T];
+  for (int i = 0; i < instance.T; ++i) {
     string name = "t" + to_string(i);
     t[i] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
   }
@@ -72,7 +72,7 @@ void wls_var_t(GRBModel *model, GRBVar *&t) {
 
 inline void symmetry1(GRBModel *model, GRBVar *t) {
   int cnt = 0;
-  for (int i = 0; i < T - 1; ++i) {
+  for (int i = 0; i < instance.T - 1; ++i) {
     string name = "ts" + to_string(i);
     model->addConstr(t[i + 1] <= t[i], name);
     cnt++;
@@ -83,8 +83,8 @@ inline void symmetry1(GRBModel *model, GRBVar *t) {
 
 inline void symmetry2(GRBModel *model, mt3 &x) {
   int cnt = 0;
-  for (int t = 0; t < T; ++t) {
-    for (int i = 0; i < N; ++i) {
+  for (int t = 0; t < instance.T; ++t) {
+    for (int i = 0; i < instance.N; ++i) {
       if (i < t) {
         GRBLinExpr expr = 0;
         for (int c = 0; c < C; ++c) {
@@ -104,13 +104,13 @@ inline void symmetry2(GRBModel *model, mt3 &x) {
 
 inline void unique(GRBModel *model, mt3 &x) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsingChannel(i, c))
         continue;
 
-      for (int t = 0; t < T; ++t)
+      for (int t = 0; t < instance.T; ++t)
         expr += x[{i, c, t}];
     }
 
@@ -123,8 +123,8 @@ inline void unique(GRBModel *model, mt3 &x) {
 
 inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
-    for (int _t = 0; _t < T; ++_t) {
+  for (int i = 0; i < instance.N; ++i) {
+    for (int _t = 0; _t < instance.T; ++_t) {
       GRBLinExpr expr = 0;
       for (int c = 0; c < C; ++c)
         if (canTransmitUsingChannel(i, c))
@@ -140,15 +140,15 @@ inline void waste(GRBModel *model, mt3 &x, GRBVar *t) {
 
 inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     for (int c1 = 0; c1 < C; ++c1) {
       if (!canTransmitUsingChannel(i, c1))
         continue;
 
-      for (int t = 0; t < T; ++t) {
+      for (int t = 0; t < instance.T; ++t) {
         GRBLinExpr expr = 0;
         for (int c2 = 0; c2 < C; ++c2) {
-          if (overlap[c1][c2] && canTransmitUsingChannel(i, c2))
+          if (instance.overlap[c1][c2] && canTransmitUsingChannel(i, c2))
             expr += x[{i, c2, t}];
         }
 
@@ -164,16 +164,16 @@ inline void ch_overlap(GRBModel *model, mt3 &z, mt3 &x) {
 
 inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
-    for (int t = 0; t < T; ++t) {
+  for (int i = 0; i < instance.N; ++i) {
+    for (int t = 0; t < instance.T; ++t) {
       for (int c = 0; c < C; ++c) {
         if (!canTransmitUsingChannel(i, c))
           continue;
 
         GRBLinExpr expr = 0;
-        for (int u = 0; u < N; ++u) {
+        for (int u = 0; u < instance.N; ++u) {
           if (u != i && canTransmitUsingChannel(u, c))
-            expr += AFF[u][i] * z[{u, c, t}];
+            expr += instance.AFF[u][i] * z[{u, c, t}];
         }
 
         string name = "interch[" + to_string(i) + "," + to_string(c) + "," +
@@ -188,15 +188,15 @@ inline void interch(GRBModel *model, mt3 &z, mt3 &Iij) {
 
 inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsingChannel(i, c))
         continue;
 
-      for (int t = 0; t < T; ++t) {
+      for (int t = 0; t < instance.T; ++t) {
         string name = "bigG[" + to_string(i) + "," + to_string(c) + "," +
                       to_string(t) + "]";
-        model->addConstr(I[i] >= Iij[{i, c, t}] - BM[i] * (1 - x[{i, c, t}]),
+        model->addConstr(I[i] >= Iij[{i, c, t}] - instance.BM[i] * (1 - x[{i, c, t}]),
                          name);
         cnt++;
       }
@@ -207,15 +207,15 @@ inline void bigG(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
 
 inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsingChannel(i, c))
         continue;
 
-      for (int t = 0; t < T; ++t) {
+      for (int t = 0; t < instance.T; ++t) {
         string name = "bigL[" + to_string(i) + "," + to_string(c) + "," +
                       to_string(t) + "]";
-        model->addConstr(I[i] <= Iij[{i, c, t}] + BM[i] * (1 - x[{i, c, t}]),
+        model->addConstr(I[i] <= Iij[{i, c, t}] + instance.BM[i] * (1 - x[{i, c, t}]),
                          name);
         cnt++;
       }
@@ -226,14 +226,14 @@ inline void bigL(GRBModel *model, GRBVar *I, mt3 &Iij, mt3 &x) {
 
 inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c) {
       if (!canTransmitUsingChannel(i, c))
         continue;
 
-      for (int t = 0; t < T; ++t) {
-        expr += (AFF[i][i] / B[i][cToBIdx(c)] - NOI) * x[{i, c, t}];
+      for (int t = 0; t < instance.T; ++t) {
+        expr += (instance.AFF[i][i] / instance.B[i][cToBIdx(c)] - instance.NOI) * x[{i, c, t}];
       }
     }
 
@@ -247,22 +247,22 @@ inline void sinr(GRBModel *model, GRBVar *I, mt3 &x) {
 inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
   int cnt = 0;
   using ptv = pair<tuple<int, int, int>, GRBVar>;
-  vector<vector<ptv>> var_l(N, vector<ptv>());
+  vector<vector<ptv>> var_l(instance.N, vector<ptv>());
 
   for (const auto &[key_x, var_x] : x) {
     const auto &[l_x, c_x, t_x] = key_x;
     var_l[l_x].push_back(make_pair(key_x, var_x));
   }
 
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     for (const auto &[key_i, var_i] : var_l[i]) {
       const auto &[_, c_i, t_i] = key_i;
-      for (int j = 0; j < N; ++j) {
+      for (int j = 0; j < instance.N; ++j) {
         if (i == j)
           continue;
 
         int bw_idx = cToBIdx(c_i);
-        double aff = B[i][bw_idx] * AFF[j][i] / AFF[i][i];
+        double aff = instance.B[i][bw_idx] * instance.AFF[j][i] / instance.AFF[i][i];
         if (definitelyGreaterThan(aff, 1.0)) {
           GRBLinExpr expr = var_i;
           bool any = false;
@@ -271,7 +271,7 @@ inline void pairwise(GRBModel *model, mt3 &x, mt3 &z) {
             const auto &[l_j, c_j, t_j] = key_j;
 
             int bw_idx_2 = cToBIdx(c_j);
-            if (!overlap[c_i][c_j] || t_i != t_j || bw_idx != bw_idx_2)
+            if (!instance.overlap[c_i][c_j] || t_i != t_j || bw_idx != bw_idx_2)
               continue;
 
             any = true;
@@ -474,37 +474,14 @@ int main(int argc, char **argv) {
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
   absl::InitializeLog();
   string input_path = absl::StrCat(argv[3], "/U_", argv[1], "/", "MD-VRBSP_U_",
-                                   argv[1], "_", argv[2], ".txt");
+                                   argv[1], "_", argv[2], ".json");
 
   LOG(INFO) << "input path is " << input_path;
 
-  freopen(input_path.c_str(), "r", stdin);
-  read_data();
-
-  auto custom_receivers = vector<pair<double, double>>();
-  auto custom_senders = vector<pair<double, double>>();
-  for (int i = 0; i < N; ++i) {
-    custom_receivers.push_back({receivers[i][0], receivers[i][1]});
-    custom_senders.push_back({senders[i][0], senders[i][1]});
-  }
-
-  Instance my_inst{
-      .N = N,
-      .alfa = alfa,
-      .NOI = NOI,
-      .powerSender = powerSender,
-      .receivers = custom_receivers,
-      .senders = custom_senders,
-      .DR = DR,
-      .SINR = SINR,
-      .B = B,
-      .C_b = C_b,
-      .GMM = GMM,
-      .overlap = overlap,
-  };
+  load_instance(input_path);
 
   json converted;
-  to_json(converted, my_inst);
+  to_json(converted, instance);
 
   std::ofstream o("pretty.json");
   o << std::setw(4) << converted << std::endl;
@@ -512,16 +489,16 @@ int main(int argc, char **argv) {
 
   // auto start = high_resolution_clock::now();
   // const Solution sol = CH_MDVRBSP();
-  // T = sol.slots.size();
+  // instance.T = sol.slots.size();
   //
-  // printf("CH o.f is %ud\n", T);
+  // printf("CH o.f is %ud\n", instance.T);
   //
   // auto stop = high_resolution_clock::now();
   // duration<double> ms_double = stop - start;
   // cout << "ch " << ms_double.count() << endl;
   //
   // // FILE *ch_obj = fopen("ch_obj", "a");
-  // // fprintf(ch_obj, "%s,%u,%lf\n", argv[2], T, ms_double.count());
+  // // fprintf(ch_obj, "%s,%u,%lf\n", argv[2], instance.T, ms_double.count());
   // // fclose(ch_obj);
   // // return 0;
   //

@@ -8,16 +8,6 @@ using namespace std;
 using mt3 = map<tuple<int, int, int>, GRBVar>;
 using mt2 = map<tuple<int, int>, GRBVar>;
 
-vector<vector<int>> C_b = {
-    {
-        0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-    },
-    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
-    {37, 38, 39, 40, 41, 42},
-    {43, 44},
-};
-
 // -------------- variables --------------------
 inline void var_y(GRBModel *model, mt3 &y, vector<int> &conns) {
   int cnt = 0;
@@ -30,7 +20,7 @@ inline void var_y(GRBModel *model, mt3 &y, vector<int> &conns) {
           string name = "y[" + to_string(i) + "," + to_string(b) + "," +
                         to_string(m) + "]";
 #ifdef ORIG_OF
-          y[{i, b, m}] = model->addVar(0.0, 1.0, DR[b][m], GRB_BINARY, name);
+          y[{i, b, m}] = model->addVar(0.0, 1.0, instance.DR[b][m], GRB_BINARY, name);
 #else
           y[{i, b, m}] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, name);
 #endif
@@ -62,7 +52,7 @@ inline void var_x(GRBModel *model, mt2 &x, vector<int> &conns) {
 }
 
 inline void var_I(GRBModel *model, GRBVar *&I, vector<int> &conns) {
-  I = new GRBVar[N];
+  I = new GRBVar[instance.N];
   for (int _i = 0; _i < conns.size(); ++_i) {
     int i = conns[_i];
     string name = "I[" + to_string(i) + "]";
@@ -111,11 +101,11 @@ inline void couple(GRBModel *model, mt3 &y, mt2 &x, vector<int> &conns) {
           expr += y[{i, b, m}];
         }
 
-      for (int c = 0; c < C_b[b].size(); ++c)
-        if (canTransmitUsingChannel(i, C_b[b][c])) {
+      for (int c : instance.C_b[b])
+        if (canTransmitUsingChannel(i, c)) {
           two = true;
-          assert(x.find({i, C_b[b][c]}) != x.end());
-          expr1 += x[{i, C_b[b][c]}];
+          assert(x.find({i, c}) != x.end());
+          expr1 += x[{i, c}];
         }
 
       assert(one == two);
@@ -154,7 +144,7 @@ inline void ch_overlap(GRBModel *model, mt2 &z, mt2 &x, vector<int> &conns) {
 
       GRBLinExpr expr = 0;
       for (int c2 = 0; c2 < C; ++c2) {
-        if (overlap[c1][c2] && canTransmitUsingChannel(i, c2))
+        if (instance.overlap[c1][c2] && canTransmitUsingChannel(i, c2))
           expr += x[{i, c2}];
       }
 
@@ -175,7 +165,7 @@ inline void interch(GRBModel *model, mt2 &z, mt2 &Iij, vector<int> &conns) {
       for (int _u = 0; _u < conns.size(); ++_u) {
         int u = conns[_u];
         if (u != i && canTransmitUsingChannel(u, c))
-          expr += AFF[u][i] * z[{u, c}];
+          expr += instance.AFF[u][i] * z[{u, c}];
       }
 
       string name = "interch[" + to_string(i) + "," + to_string(c) + "]";
@@ -193,7 +183,7 @@ inline void bigG(GRBModel *model, GRBVar *I, mt2 &Iij, mt2 &x,
         continue;
 
       string name = "bigG[" + to_string(i) + "," + to_string(c) + "]";
-      model->addConstr(I[i] >= Iij[{i, c}] - BM[i] * (1 - x[{i, c}]), name);
+      model->addConstr(I[i] >= Iij[{i, c}] - instance.BM[i] * (1 - x[{i, c}]), name);
     }
   }
 }
@@ -207,7 +197,7 @@ inline void bigL(GRBModel *model, GRBVar *I, mt2 &Iij, mt2 &x,
         continue;
 
       string name = "bigL[" + to_string(i) + "," + to_string(c) + "]";
-      model->addConstr(I[i] <= Iij[{i, c}] + BM[i] * (1 - x[{i, c}]), name);
+      model->addConstr(I[i] <= Iij[{i, c}] + instance.BM[i] * (1 - x[{i, c}]), name);
     }
   }
 }
@@ -220,7 +210,7 @@ inline void sinr(GRBModel *model, GRBVar *I, mt2 &x, vector<int> &conns) {
       if (!canTransmitUsingChannel(i, c))
         continue;
 
-      expr += (AFF[i][i] / B[i][cToBIdx(c)] - NOI) * x[{i, c}];
+      expr += (instance.AFF[i][i] / instance.B[i][cToBIdx(c)] - instance.NOI) * x[{i, c}];
     }
 
     string name = "sinr[" + to_string(i) + "]";
@@ -236,7 +226,7 @@ void basic_vrbsp() {
   mt3 y;
 
   vector<int> l_to_idx;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     l_to_idx.push_back(i);
 
   // variables
@@ -264,12 +254,11 @@ void basic_vrbsp() {
 };
 
 int main(int argc, char **argv) {
-  freopen(argv[3], "r", stdin);
   printf("running VRBSP\nopening %s\n", argv[3]);
-  read_data();
+  load_instance(argv[3]);
   basic_vrbsp();
   set<int> scheduled;
-  int off = N, OF = 0;
+  int off = instance.N, OF = 0;
 
   double elapsed = 0.0;
   string solFileName = "sol" + string(argv[1]) + "_" + string(argv[2]) + ".sol";
@@ -278,7 +267,7 @@ int main(int argc, char **argv) {
     auto start = std::chrono::steady_clock::now();
 
     vector<int> l_to_idx;
-    for (int i = 0, idx = l_to_idx.size(); i < N; ++i)
+    for (int i = 0, idx = l_to_idx.size(); i < instance.N; ++i)
       if (scheduled.find(i) == scheduled.end())
         l_to_idx.push_back(i);
 
@@ -366,8 +355,8 @@ int main(int argc, char **argv) {
   }
 
   fclose(solFile);
-  if (scheduled.size() != N)
-    OF += N - scheduled.size();
+  if (scheduled.size() != instance.N)
+    OF += instance.N - scheduled.size();
 
   FILE *obj = fopen("obj", "a");
   fprintf(obj, "%s\t%d\t%.3lf\n", argv[2], OF, elapsed);

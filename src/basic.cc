@@ -19,124 +19,23 @@ FILE *progress_file;
 const uint32_t seed = 77;
 
 Instance instance;
-int N, T, cnt;
-double alfa, NOI, powerSender;
-double receivers[MAX_CONN][2], senders[MAX_CONN][2];
-double AFF[MAX_CONN][MAX_CONN];
-double DM[MAX_CONN][MAX_CONN];
-vector<vector<double>> DR, SINR, B;
+int cnt;
 
 mt19937 gen{seed};
 uniform_int_distribution<> dist{0, MAX_CONN};
-vector<double> GMM, BM;
 map<pair<int, int>, vector<int>> overlappings;
 
 unordered_map<string, function<double(const vector<double> &)>>
-    algorithm_mapping;
+  algorithm_mapping = {{"mic", decoder_mic},
+             {"dp", decoder_dp},
+             {"gcsid", decoder_gcsid},
+             {"gcsid_plus", decoder_gcsid_plus},
+             {"gcsid_greedy", decoder_gcsid_greedy},
+             {"local_search", decoder_local_search}};
 
 ABSL_FLAG(
     std::string, ACTIVE_DECODER, "mic",
     "Decoder/heuristic type: Classic - 0 | Classic DP - 1 | Fixed DP - 2");
-
-const vector<set<int>> available_channels = {
-    {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-     13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24},
-    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
-    {37, 38, 39, 40, 41, 42},
-    {43, 44},
-};
-
-vector<vector<int>> overlap = {
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0},
-    {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
-     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0},
-    {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-     0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1}};
 
 Connection::Connection(int id, double throughput, double interference,
                        double distanceSR)
@@ -152,7 +51,7 @@ Connection::Connection(int id) : id(id) {
   interference = 0.0;
   SINR = 0.0;
   violation = 0.0;
-  distanceSR = DM[id][id];
+  distanceSR = instance.DM[id][id];
   mcs = -1;
 }
 
@@ -293,24 +192,8 @@ void fix_channels(Solution &sol) {
   computeThroughput(sol);
 }
 
-void distanceAndInterference() {
-  for (int i = 0; i < N; i++) {
-    double sender_i_x = senders[i][0];
-    double sender_i_y = senders[i][1];
-
-    for (int j = 0; j < N; j++) {
-      double receiver_j_x = receivers[j][0];
-      double receiver_j_y = receivers[j][1];
-
-      double dist =
-          distance(sender_i_x, sender_i_y, receiver_j_x, receiver_j_y);
-      DM[i][j] = dist;
-    }
-  }
-}
-
 bool SINRfeas(const Connection &con, int bw) {
-  return GreaterOrEqual(con.SINR, B[con.id][bToIdx(bw)]);
+  return GreaterOrEqual(con.SINR, instance.B[con.id][bToIdx(bw)]);
 }
 
 double computeConnectionThroughput(Connection &i, int bw) {
@@ -318,20 +201,20 @@ double computeConnectionThroughput(Connection &i, int bw) {
     return 0.0;
 
   if (approximatelyEqual(i.interference, 0.0, EPS)) {
-    i.SINR = SINR[11][bToIdx(bw)];
-    i.throughput = DR[11][bToIdx(bw)];
+    i.SINR = instance.SINR[11][bToIdx(bw)];
+    i.throughput = instance.DR[11][bToIdx(bw)];
   } else {
-    i.SINR = AFF[i.id][i.id] / (i.interference + NOI);
+    i.SINR = instance.AFF[i.id][i.id] / (i.interference + instance.NOI);
 
     int mcs = 11;
-    while (mcs >= 0 && definitelyLessThan(i.SINR, SINR[mcs][bToIdx(bw)]))
+    while (mcs >= 0 && definitelyLessThan(i.SINR, instance.SINR[mcs][bToIdx(bw)]))
       mcs--;
 
     if (mcs < 0) {
       i.throughput = 0.0;
       mcs = -1;
     } else {
-      i.throughput = DR[mcs][bToIdx(bw)];
+      i.throughput = instance.DR[mcs][bToIdx(bw)];
       i.mcs = mcs;
     }
   }
@@ -352,7 +235,7 @@ optional<Channel> deleteFromChannel(Channel channel, int idConn) {
   channel.throughput = 0.0;
   channel.violation = 0.0;
   for (Connection &conn : channel.connections) {
-    conn.interference -= AFF[idConn][conn.id];
+    conn.interference -= instance.AFF[idConn][conn.id];
 
     computeConnectionThroughput(conn, channel.bandwidth);
     channel.throughput += conn.throughput;
@@ -362,11 +245,11 @@ optional<Channel> deleteFromChannel(Channel channel, int idConn) {
 }
 
 optional<Channel> insertInChannel(Channel new_c, int i_idx, bool force) {
-  Connection new_conn(i_idx, 0.0, 0.0, DM[i_idx][i_idx]);
+  Connection new_conn(i_idx, 0.0, 0.0, instance.DM[i_idx][i_idx]);
 
   for (auto &j : new_c.connections) {
-    j.interference += AFF[i_idx][j.id];
-    new_conn.interference += AFF[j.id][i_idx];
+    j.interference += instance.AFF[i_idx][j.id];
+    new_conn.interference += instance.AFF[j.id][i_idx];
   }
 
   new_c.throughput = 0.0;
@@ -418,7 +301,7 @@ optional<vector<Channel>> split(Channel toSplit, vector<double> *GMA) {
 }
 
 optional<Channel> try_insert(int conn_id, optional<Channel> ch) {
-  if (definitelyGreaterThan(GMM[conn_id], DR[11][bToIdx(ch->bandwidth)]))
+  if (definitelyGreaterThan(instance.GMM[conn_id], instance.DR[11][bToIdx(ch->bandwidth)]))
     return nullopt;
 
   ch = insertInChannel(*ch, conn_id);
@@ -426,7 +309,7 @@ optional<Channel> try_insert(int conn_id, optional<Channel> ch) {
     return nullopt;
 
   for (Connection &conn : ch->connections)
-    if (definitelyLessThan(conn.SINR, B[conn.id][bToIdx(ch->bandwidth)]))
+    if (definitelyLessThan(conn.SINR, instance.B[conn.id][bToIdx(ch->bandwidth)]))
       return nullopt;
 
   return ch;
@@ -437,7 +320,7 @@ bool can_split(const Channel &ch) {
     return false;
 
   for (const auto &conn : ch.connections)
-    if (definitelyLessThan(DR[11][bToIdx(ch.bandwidth / 2)], GMM[conn.id]))
+    if (definitelyLessThan(instance.DR[11][bToIdx(ch.bandwidth / 2)], instance.GMM[conn.id]))
       return false;
 
   return true;
@@ -655,9 +538,9 @@ static double priceInsertion(const Channel &ch, int extra) {
   double total = 0.0, extraInterference = 0.0;
   for (const auto &conn : ch.connections) {
     Connection c = conn;
-    c.interference += AFF[conn.id][extra];
+    c.interference += instance.AFF[conn.id][extra];
     total += computeConnectionThroughput(c, ch.bandwidth);
-    extraInterference += AFF[extra][conn.id];
+    extraInterference += instance.AFF[extra][conn.id];
   }
   Connection tmp(extra);
   tmp.interference = extraInterference;
@@ -953,7 +836,7 @@ double decoder_local_search(const vector<double> &variables) {
 
 double Solution::decode(std::vector<double> variables) const {
   std::string decoder_flag = absl::GetFlag(FLAGS_ACTIVE_DECODER);
-  return algorithm_mapping[decoder_flag](variables);
+  return algorithm_mapping.at(decoder_flag)(variables);
 }
 
 #endif
@@ -968,7 +851,7 @@ Solution CH_MDVRBSP() {
   TimeSlot dummy_ts(chs);
   Solution ret({dummy_ts});
 
-  vector<int> links(N);
+  vector<int> links(instance.N);
   iota(links.begin(), links.end(), 0);
   shuffle(links.begin(), links.end(), gen);
 
@@ -986,7 +869,7 @@ Solution CH_MDVRBSP() {
         }
 
         if (can_split(ret(t, c))) {
-          auto ch_split = split(ret(t, c), &GMM);
+          auto ch_split = split(ret(t, c), &instance.GMM);
 
           if (!ch_split)
             continue;
@@ -1013,7 +896,7 @@ Solution CH_MDVRBSP() {
       Connection new_conn{conn};
 
       new_conn.SINR = 1000000007;
-      new_conn.throughput = DR[11][bToIdx(bw)];
+      new_conn.throughput = instance.DR[11][bToIdx(bw)];
       new_ts(0).connections.emplace_back(new_conn);
       ret.slots.emplace_back(new_ts);
       goto NEXT_CONN;
@@ -1056,116 +939,33 @@ int Solution::remove_connection(int i) {
   return found;
 }
 
-void read_data() {
-  int n_spectrums;
-  scanf("%d %lf %lf %lf %d", &N, &alfa, &NOI, &powerSender, &n_spectrums);
+void load_instance(const string &path) {
+  std::ifstream input(path);
+  if (!input)
+    throw std::runtime_error("cannot open instance: " + path);
+  instance = json::parse(input).get<Instance>();
 
-  for (int i = 0; i < n_spectrums; i++) {
-    int s;
-    scanf("%d", &s);
-  }
-
-  if (NOI != 0) {
-    NOI = convertDBMToMW(NOI);
-  }
-
-  for (int i = 0; i < N; i++) {
-    double a, b;
-    scanf("%lf %lf", &a, &b);
-    receivers[i][0] = a;
-    receivers[i][1] = b;
-  }
-
-  for (int i = 0; i < N; i++) {
-    double a, b;
-    scanf("%lf %lf", &a, &b);
-    senders[i][0] = a;
-    senders[i][1] = b;
-  }
-
-  GMM.assign(N, 0.0);
-  for (int i = 0; i < N; i++) {
-    double bt;
-    scanf("%lf", &bt);
-#if defined(USE_MDVRBSP_IP) || defined(USE_MDVRBSP_COL_GEN)
-    GMM[i] = bt;
-#endif
-  }
-
-  DR.assign(12, vector<double>(4, 0));
-  for (int i = 0; i < 12; i++) {
-    for (int j = 0; j < 4; j++) {
-      double a;
-      scanf("%lf", &a);
-      DR[i][j] = a;
+  overlappings.clear();
+  for (int i = 0; i < C; ++i)
+    for (int b = 0; b < BAND; ++b) {
+      vector<int> channels;
+      for (int channel : instance.C_b[b])
+        if (instance.overlap[i][channel])
+          channels.push_back(channel);
+      overlappings[{i, idxToB(b)}] = channels;
     }
-  }
-
-  SINR.assign(12, vector<double>(4, 0));
-  for (int i = 0; i < 12; i++) {
-    for (int j = 0; j < 4; j++) {
-      double a;
-      scanf("%lf", &a);
-      SINR[i][j] = a;
-    }
-  }
-
-  convertTableToMW(SINR, SINR);
-  distanceAndInterference();
-
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
-      double value = powerSender / pow(DM[i][j], alfa);
-      AFF[i][j] = value;
-    }
-  }
-
-  // TODO: find a better value for this big-M
-  BM.assign(N, 100.0);
-  B.assign(N, vector<double>(4, 0));
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; ++j) {
-      if (i != j)
-        BM[i] += AFF[j][i];
-
-      if (i != j) {
-        int bwj = necessaryBw(GMM[j]);
-        int bwi = necessaryBw(GMM[i]);
-
-        if (bwj >= bwi)
-          BM[i] += AFF[j][i] + 0.0005;
-      }
-    }
-
-    for (int j = 0; j < 4; j++) {
-      double value = gammaToBeta(GMM[i], j);
-      assert(definitelyGreaterThan(value, 0.0));
-      B[i][j] = value;
-    }
-  }
-
-  for (int i = 0; i < 45; ++i) {
-    for (int b = 0; b < 4; ++b) {
-      vector<int> overlaps;
-      for (int x : available_channels[b])
-        if (overlap[i][x])
-          overlaps.push_back(x);
-
-      overlappings[make_pair(i, idxToB(b))] = overlaps;
-    }
-  }
 }
 
 double gammaToBeta(double gmm, int bw) {
   int mcs = 0;
 
-  while (mcs < 12 && definitelyGreaterThan(gmm, DR[mcs][bw]))
+  while (mcs < 12 && definitelyGreaterThan(gmm, instance.DR[mcs][bw]))
     mcs++;
 
   if (mcs < 12)
-    return SINR[mcs][bw];
+    return instance.SINR[mcs][bw];
 
-  return SINR[11][3] + 1.0;
+  return instance.SINR[11][3] + 1.0;
 }
 
 double convertDBMToMW(double _value) {
@@ -1207,7 +1007,7 @@ double computeThroughput(Solution &curr, bool force) {
         u.interference = 0.0;
         u.throughput = 0.0;
         for (Connection &v : ch.connections)
-          u.interference += u.id == v.id ? 0.0 : AFF[v.id][u.id];
+          u.interference += u.id == v.id ? 0.0 : instance.AFF[v.id][u.id];
 
         ch.throughput += computeConnectionThroughput(u, ch.bandwidth);
       }
@@ -1258,7 +1058,7 @@ void K_RemoveAndInserts(Solution &sol, int K) {
   int k = 0;
 
   set<int> set_unscheduled;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     set_unscheduled.insert(i);
 
   K = min(K, int(sol.get_scheduled_connections().size()));
@@ -1287,7 +1087,7 @@ void K_RemoveAndInserts(Solution &sol, int K) {
 
 void K_AddDrop(Solution &sol, int K) {
   set<pair<int, int>> set_unscheduled;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     set_unscheduled.insert({i, false});
 
   for (const TimeSlot &st : sol.slots)
@@ -1336,7 +1136,9 @@ void label_channels(Solution &sol) {
   };
   sort(sol(0).channels.rbegin(), sol(0).channels.rend(), cmp_channels);
 
-  auto available_channels_local = available_channels;
+  vector<set<int>> available_channels_local;
+  for (const auto &channels : instance.C_b)
+    available_channels_local.emplace_back(channels.begin(), channels.end());
 
   for (Channel &ch : sol(0).channels) {
     int bw_ix = bToIdx(ch.bandwidth);
@@ -1348,7 +1150,7 @@ void label_channels(Solution &sol) {
     for (int bw_ix2 = 0; bw_ix2 < 4; bw_ix2++) {
       vector<int> to_remove;
       for (int ix : available_channels_local[bw_ix2])
-        if (overlap[channel_ix][ix])
+        if (instance.overlap[channel_ix][ix])
           to_remove.push_back(ix);
 
       for (int remove : to_remove)
@@ -1475,12 +1277,12 @@ Solution CH_VRBSP() {
   TimeSlot init(vector<Channel>{c160, c160, c80, c80, c20});
   Solution ret(vector<TimeSlot>{init});
   vector<int> links;
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < instance.N; i++)
     links.emplace_back(i);
 
   shuffle(links.begin(), links.end(), gen);
 
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     Solution tmp = ret;
 
     for (int c = 0; c < ret(0).channels.size(); ++c) {
@@ -1519,7 +1321,7 @@ Solution CH_VRBSP() {
     ret = tmp;
   }
 
-  T = 1;
+  instance.T = 1;
   return ret;
 }
 
@@ -1645,7 +1447,7 @@ void computeChannelThroughput(Channel &ch) {
     u.interference = 0.0;
     u.throughput = 0.0;
     for (Connection &v : ch.connections)
-      u.interference += u.id == v.id ? 0.0 : AFF[v.id][u.id];
+      u.interference += u.id == v.id ? 0.0 : instance.AFF[v.id][u.id];
 
     ch.throughput += computeConnectionThroughput(u, ch.bandwidth);
   }
@@ -1692,7 +1494,7 @@ Solution local_search(const Solution &sol20) {
   do {
     best_found_before = best_multiple.throughput_;
 
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < instance.N; ++i) {
       dii best_of_i = {best_multiple.throughput_, {-2, -2}};
 
       Solution baseline = best_multiple;
@@ -1734,7 +1536,7 @@ Solution local_search(const Solution &sol20) {
 
   Solution ret{vector<TimeSlot>{TimeSlot()}};
   ret.throughput_ = best_multiple.throughput_;
-  for (int t = 0; t < T; ++t)
+  for (int t = 0; t < instance.T; ++t)
     for (int c = 0; c < 25; ++c)
       ret(t).channels.push_back(best_multiple(t, c));
 
@@ -1749,11 +1551,11 @@ Solution local_search(const Solution &sol20) {
   do {
     improved = false;
 
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < instance.N; ++i) {
       misi mapping;
 
       set<int> free_connections;
-      for (int j = 0; j < N; ++j)
+      for (int j = 0; j < instance.N; ++j)
         free_connections.insert(j);
 
       for (const TimeSlot &ts : sol20.slots)
@@ -1761,7 +1563,7 @@ Solution local_search(const Solution &sol20) {
           for (const Connection &conn : ch.connections)
             if (conn.id != i) {
               for (int o_c = 0; o_c < 45; ++o_c)
-                if (overlap[ch.ix][o_c])
+                if (instance.overlap[ch.ix][o_c])
                   mapping[conn.id].insert(o_c);
 
               free_connections.erase(conn.id);
@@ -1790,25 +1592,15 @@ Solution local_search(const Solution &sol20) {
 #if defined(USE_VNS_MATH_SOLVER) || defined(USE_VRBSP_IP) ||                   \
     defined(USE_MDVRBSP_IP)
 
-vector<unordered_set<int>> C_b = {
-    {
-        0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-    },
-    {25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36},
-    {37, 38, 39, 40, 41, 42},
-    {43, 44},
-};
-
 void couple(GRBModel *model, GRBVar y[][BAND][M], GRBVar x[][C]) {
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int b = 0; b < 4; ++b) {
       GRBLinExpr expr1 = 0, expr2 = 0;
 
       for (int m = 0; m < 12; ++m)
         expr1 += y[i][b][m];
 
-      for (const int c : C_b[b])
+      for (const int c : instance.C_b[b])
         expr2 += x[i][c];
 
       model->addConstr(expr1 <= expr2,
@@ -1817,7 +1609,7 @@ void couple(GRBModel *model, GRBVar y[][BAND][M], GRBVar x[][C]) {
 }
 
 void unique(GRBModel *model, GRBVar x[][C]) {
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c)
       expr += x[i][c];
@@ -1827,12 +1619,12 @@ void unique(GRBModel *model, GRBVar x[][C]) {
 }
 
 void ch_overlap(GRBModel *model, GRBVar z[][C], GRBVar x[][C]) {
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c) {
       GRBLinExpr expr = 0;
 
       for (int c1 = 0; c1 < C; ++c1)
-        if (overlap[c1][c])
+        if (instance.overlap[c1][c])
           expr += x[i][c1];
 
       model->addConstr(z[i][c] == expr,
@@ -1841,18 +1633,18 @@ void ch_overlap(GRBModel *model, GRBVar z[][C], GRBVar x[][C]) {
 }
 
 void interch(GRBModel *model, GRBVar z[][C], GRBVar Iij[][C]) {
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     for (int c = 0; c < C; ++c) {
       GRBLinExpr expr = 0;
 
-      for (int j = 0; j < N; ++j) {
+      for (int j = 0; j < instance.N; ++j) {
         if (i == j)
           continue;
 
-        expr += AFF[j][i] * z[j][c];
+        expr += instance.AFF[j][i] * z[j][c];
         // for (int c1 = 0; c1 < C; ++c1)
-        //   if (overlap[c][c1])
-        //     expr += AFF[j][i] * z[j][c1];
+        //   if (instance.overlap[c][c1])
+        //     expr += instance.AFF[j][i] * z[j][c1];
       }
 
       model->addConstr(Iij[i][c] == expr,
@@ -1862,16 +1654,16 @@ void interch(GRBModel *model, GRBVar z[][C], GRBVar Iij[][C]) {
 }
 
 void bigG(GRBModel *model, GRBVar I[], GRBVar Iij[][C], GRBVar x[][C]) {
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c)
-      model->addConstr(I[i] >= Iij[i][c] - BM[i] * (1 - x[i][c]),
+      model->addConstr(I[i] >= Iij[i][c] - instance.BM[i] * (1 - x[i][c]),
                        "bigG" + to_string(i) + "," + to_string(c));
 }
 
 void bigL(GRBModel *model, GRBVar I[], GRBVar Iij[][C], GRBVar x[][C]) {
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c)
-      model->addConstr(I[i] <= Iij[i][c] + BM[i] * (1 - x[i][c]),
+      model->addConstr(I[i] <= Iij[i][c] + instance.BM[i] * (1 - x[i][c]),
                        "bigL" + to_string(i) + "," + to_string(c));
 }
 
@@ -1888,14 +1680,14 @@ void interference(GRBModel *model, GRBVar I[], GRBVar x[][45]) {
   //         for (const auto &[t1, _] : x[i][c]) {
   //
   //           for (const auto &[c2, _] : x[j]) {
-  //             if (!overlap[c][c2])
+  //             if (!instance.overlap[c][c2])
   //               continue;
   //
   //             for (const auto &[t2, _] : x[j][c2]) {
   //               if (t1 != t2)
   //                 continue;
   //
-  //               expr += AFF[j][i] * (x[i][c][t1] * x[j][c2][t1]);
+  //               expr += instance.AFF[j][i] * (x[i][c][t1] * x[j][c2][t1]);
   //             }
   //           }
   //         }
@@ -1912,12 +1704,12 @@ void interference(GRBModel *model, GRBVar I[], GRBVar x[][45]) {
 }
 
 void sinr(GRBModel *model, GRBVar I[], GRBVar y[][BAND][M]) {
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     GRBLinExpr expr = 0;
 
     for (int b = 0; b < 4; ++b)
       for (int m = 0; m < 12; ++m)
-        expr += (AFF[i][i] / SINR[m][b] - NOI) * y[i][b][m];
+        expr += (instance.AFF[i][i] / instance.SINR[m][b] - instance.NOI) * y[i][b][m];
 
     model->addConstr(I[i] <= expr, "sinr" + to_string(i));
   }
@@ -1941,7 +1733,7 @@ protected:
           Channel ch(ChannelIdToBandwidth(c), {});
           ch.ix = c;
 
-          for (int i = 0; i < N; ++i) {
+          for (int i = 0; i < instance.N; ++i) {
             double x_val = getSolution(x[{i, c}]);
             if (approximatelyEqual(x_val, 1.0))
               ch.connections.push_back(i);
@@ -1973,7 +1765,7 @@ protected:
           assert(approximatelyEqual(dp_of, obj) ||
                  definitelyGreaterThan(dp_of, obj));
 
-          for (int i = 0; i < N; ++i) {
+          for (int i = 0; i < instance.N; ++i) {
             for (int c = 0; c < C; ++c)
               setSolution(x[{i, c}], 0.0);
 
@@ -2022,7 +1814,7 @@ Solution vrbsp(misi &connections_channels) {
     for (const auto &[l, _] : connections_channels)
       links.push_back(l);
   else
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < instance.N; ++i) {
       links.push_back(i);
 
       for (int c = 0; c < 45; ++c)
@@ -2053,7 +1845,7 @@ Solution vrbsp(misi &connections_channels) {
 
   // map<pair<int, int>, GRBVar> x_map;
   // map<pair<int, pair<int, int>>, GRBVar> y_map;
-  // for (int i = 0; i < N; ++i) {
+  // for (int i = 0; i < instance.N; ++i) {
   //   for (int c = 0; c < C; ++c)
   //     x_map[{i, c}] = x[i][c];
   //
@@ -2077,7 +1869,7 @@ Solution vrbsp(misi &connections_channels) {
     // assert(model->get(GRB_IntAttr_SolCount) != 0);
     // model->write("sol.sol");
     //
-    // vector<map<int, vector<int>>> grb_sol(T);
+    // vector<map<int, vector<int>>> grb_sol(instance.T);
     //
     // for (const auto &[j, channels] : x)
     //   for (const auto &[c, time_slots] : x[j])
@@ -2111,10 +1903,10 @@ Solution vrbsp(misi &connections_channels) {
 // Build INTEGER PROGRAM
 void var_y(GRBModel *model, GRBVar y[][BAND][M], misi &connection_channels) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int b = 0; b < 4; ++b)
       for (int m = 0; m < 12; ++m, ++cnt)
-        y[i][b][m] = model->addVar(0.0, 1.0, DR[m][b], GRB_BINARY,
+        y[i][b][m] = model->addVar(0.0, 1.0, instance.DR[m][b], GRB_BINARY,
                                    "y" + to_string(i) + "," + to_string(b) +
                                        "," + to_string(m));
   printf("Created %d y_vars\n", cnt);
@@ -2122,7 +1914,7 @@ void var_y(GRBModel *model, GRBVar y[][BAND][M], misi &connection_channels) {
 
 void var_x(GRBModel *model, GRBVar x[][C], misi &connection_channels) {
   int cnt = 0;
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c, ++cnt)
       x[i][c] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
                               "x" + to_string(i) + "," + to_string(c));
@@ -2132,8 +1924,8 @@ void var_x(GRBModel *model, GRBVar x[][C], misi &connection_channels) {
 
 void var_t(GRBModel *model, GRBVar *t, vector<int> &links,
            misi &mapping_i_channels) {
-  t = new GRBVar[T];
-  for (int i = 0; i < T; ++i) {
+  t = new GRBVar[instance.T];
+  for (int i = 0; i < instance.T; ++i) {
     string name = "t" + to_string(i);
     t[i] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, name);
   }
@@ -2142,7 +1934,7 @@ void var_t(GRBModel *model, GRBVar *t, vector<int> &links,
 void var_I(GRBModel *model, GRBVar I[], misi &mapping_i_channels) {
   int cnt = 0;
 
-  for (int i = 0; i < N; ++i, ++cnt)
+  for (int i = 0; i < instance.N; ++i, ++cnt)
     I[i] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                          "I" + to_string(i));
 
@@ -2152,7 +1944,7 @@ void var_I(GRBModel *model, GRBVar I[], misi &mapping_i_channels) {
 void var_Iij(GRBModel *model, GRBVar Iij[][C], misi &connection_channels) {
   int cnt = 0;
 
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < 45; ++c, ++cnt)
       Iij[i][c] = model->addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS,
                                 "Iij" + to_string(i) + "," + to_string(c));
@@ -2163,7 +1955,7 @@ void var_Iij(GRBModel *model, GRBVar Iij[][C], misi &connection_channels) {
 void var_z(GRBModel *model, GRBVar z[][C], misi &connection_channels) {
   int cnt = 0;
 
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < instance.N; i++)
     for (int c = 0; c < 45; ++c, ++cnt)
       z[i][c] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY,
                               "z" + to_string(i) + "," + to_string(c));
@@ -2190,7 +1982,7 @@ bool GreaterOrEqual(double a, double b) {
 
 int necessaryBw(double dr) {
   for (int i = 0; i < 4; ++i) {
-    if (definitelyGreaterThan(DR[11][i], dr))
+    if (definitelyGreaterThan(instance.DR[11][i], dr))
       return i;
   }
 
@@ -2247,13 +2039,13 @@ bool definitelyLessThan(double a, double b, double epsilon) {
 }
 
 bool canTransmitUsingChannel(int i, int c) {
-  return definitelyGreaterThan(DR[11][cToBIdx(c)], GMM[i]) ||
-         approximatelyEqual(DR[11][cToBIdx(c)], GMM[i]);
+  return definitelyGreaterThan(instance.DR[11][cToBIdx(c)], instance.GMM[i]) ||
+         approximatelyEqual(instance.DR[11][cToBIdx(c)], instance.GMM[i]);
 }
 
 bool canTransmitUsingBandwidth(int i, int b, int m) {
-  return definitelyGreaterThan(DR[m][b], GMM[i]) ||
-         approximatelyEqual(DR[m][b], GMM[i]);
+  return definitelyGreaterThan(instance.DR[m][b], instance.GMM[i]) ||
+         approximatelyEqual(instance.DR[m][b], instance.GMM[i]);
 }
 
 vector<string> gurobi_sol(const Solution &sol) {
@@ -2272,47 +2064,85 @@ vector<string> gurobi_sol(const Solution &sol) {
 
 void from_json(const json &j, Instance &inst) {
   j.at("N").get_to(inst.N);
-  j.at("alfa").get_to(inst.alfa);
-  j.at("NOI").get_to(inst.NOI);
-  j.at("powerSender").get_to(inst.powerSender);
+  inst.T = j.value("T", inst.N);
+  inst.alfa = j.value("alfa", 3.0);
+  inst.NOI = j.at("noise").get<double>();
+  if (inst.NOI != 0.0)
+    inst.NOI = convertDBMToMW(inst.NOI);
+  inst.powerSender = j.at("power_sender").get<double>();
   j.at("receivers").get_to(inst.receivers);
   j.at("senders").get_to(inst.senders);
-  j.at("AFF").get_to(inst.AFF);
-  j.at("DM").get_to(inst.DM);
-  j.at("DR").get_to(inst.DR);
+  j.at("data_rates").get_to(inst.DR);
   j.at("SINR").get_to(inst.SINR);
-  j.at("B").get_to(inst.B);
-  j.at("GMM").get_to(inst.GMM);
+  j.at("gamma").get_to(inst.GMM);
   j.at("overlap").get_to(inst.overlap);
-  j.at("BM").get_to(inst.BM);
 
-  inst.C_b.clear();
-  inst.C_b.reserve(j.at("C_b").size());
-  for (const auto &arr : j.at("C_b")) {
-    vector<int> tmp = arr.get<vector<int>>();
-    inst.C_b.emplace_back(tmp.begin(), tmp.end());
+  if (inst.N <= 0 || inst.N > MAX_CONN || inst.receivers.size() != inst.N ||
+      inst.senders.size() != inst.N || inst.GMM.size() != inst.N ||
+      inst.DR.size() != M || inst.SINR.size() != M ||
+      inst.overlap.size() != C)
+    throw std::invalid_argument("invalid instance dimensions");
+  for (int i = 0; i < M; ++i)
+    if (inst.DR[i].size() != BAND || inst.SINR[i].size() != BAND)
+      throw std::invalid_argument("invalid rate table dimensions");
+  for (const auto &row : inst.overlap)
+    if (row.size() != C)
+      throw std::invalid_argument("invalid overlap dimensions");
+
+  inst.initialize_derived_data();
+}
+
+void Instance::initialize_derived_data() {
+  C_b.assign(BAND, {});
+  for (int c = 0; c < C; ++c)
+    C_b[cToBIdx(c)].insert(c);
+
+  DM.assign(N, vector<double>(N));
+  AFF.assign(N, vector<double>(N));
+  for (int i = 0; i < N; ++i)
+    for (int k = 0; k < N; ++k) {
+      DM[i][k] = distance(senders[i].first, senders[i].second,
+                          receivers[k].first, receivers[k].second);
+      if (DM[i][k] == 0.0)
+        throw std::invalid_argument("sender and receiver coincide");
+      AFF[i][k] = powerSender / pow(DM[i][k], alfa);
+    }
+
+  B.assign(N, vector<double>(BAND));
+  BM.assign(N, 100.0);
+  auto necessary_bw = [&](double rate) {
+    for (int b = 0; b < BAND; ++b)
+      if (definitelyGreaterThan(DR[M - 1][b], rate))
+        return b;
+    return -1;
+  };
+  for (int i = 0; i < N; ++i) {
+    for (int k = 0; k < N; ++k) {
+      if (i == k)
+        continue;
+      BM[i] += AFF[k][i];
+      if (necessary_bw(GMM[k]) >= necessary_bw(GMM[i]))
+        BM[i] += AFF[k][i] + 0.0005;
+    }
+    for (int b = 0; b < BAND; ++b) {
+      int mcs = 0;
+      while (mcs < M && definitelyGreaterThan(GMM[i], DR[mcs][b]))
+        ++mcs;
+      B[i][b] = mcs < M ? SINR[mcs][b] : SINR[M - 1][BAND - 1] + 1.0;
+    }
   }
 }
 
 void to_json(json &j, const Instance &inst) {
   j = json{{"N", inst.N},
            {"alfa", inst.alfa},
-           {"NOI", inst.NOI},
-           {"powerSender", inst.powerSender},
+           {"T", inst.T},
+           {"noise", inst.NOI == 0.0 ? 0.0 : 10.0 * log10(inst.NOI)},
+           {"power_sender", inst.powerSender},
            {"receivers", inst.receivers},
            {"senders", inst.senders},
-           {"AFF", inst.AFF},
-           {"DM", inst.DM},
-           {"DR", inst.DR},
+           {"data_rates", inst.DR},
            {"SINR", inst.SINR},
-           {"B", inst.B},
-           {"GMM", inst.GMM},
-           {"overlap", inst.overlap},
-           {"BM", inst.BM}};
-
-  json c_b_json = json::array();
-  for (const auto &s : inst.C_b) {
-    c_b_json.push_back(vector<int>(s.begin(), s.end()));
-  }
-  j["C_b"] = c_b_json;
+           {"gamma", inst.GMM},
+           {"overlap", inst.overlap}};
 }

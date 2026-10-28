@@ -1,10 +1,9 @@
 #include "basic.h"
 
 int main(int argc, char **argv) {
-  freopen(argv[1], "r", stdin);
-  read_data();
+  load_instance(argv[1]);
 
-  T = 1;
+  instance.T = 1;
 
   misi dummy;
   Solution ans = vrbsp(dummy);

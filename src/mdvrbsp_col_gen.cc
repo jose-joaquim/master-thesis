@@ -6,8 +6,8 @@ using namespace std;
 using mt3 = map<tuple<int, int, int>, GRBVar>;
 
 bool canTransmitUsing(int i, int c) {
-  return definitelyGreaterThan(DR[11][cToBIdx(c)], GMM[i]) ||
-         approximatelyEqual(DR[11][cToBIdx(c)], GMM[i]);
+  return definitelyGreaterThan(instance.DR[11][cToBIdx(c)], instance.GMM[i]) ||
+         approximatelyEqual(instance.DR[11][cToBIdx(c)], instance.GMM[i]);
 }
 
 void build_subproblem(GRBModel &model, mt3 &x, vector<GRBVar> &y,
@@ -15,10 +15,10 @@ void build_subproblem(GRBModel &model, mt3 &x, vector<GRBVar> &y,
   // variables
   printf("variables...\n");
 
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     y.push_back(model.addVar(0.0, 1.0, pi[i], GRB_BINARY, "y" + to_string(i)));
 
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c)
       for (int m = 0; m < M; ++m)
         if (canTransmitUsing(i, c))
@@ -30,7 +30,7 @@ void build_subproblem(GRBModel &model, mt3 &x, vector<GRBVar> &y,
   model.update();
 
   printf("constraints...\n");
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < instance.N; ++i) {
     GRBLinExpr expr = 0;
     for (int c = 0; c < C; ++c)
       if (canTransmitUsing(i, c))
@@ -40,21 +40,21 @@ void build_subproblem(GRBModel &model, mt3 &x, vector<GRBVar> &y,
     model.addConstr(expr == y[i], "y==sum(x)_" + to_string(i));
   }
 
-  for (int i = 0; i < N; ++i)
+  for (int i = 0; i < instance.N; ++i)
     for (int c = 0; c < C; ++c)
       if (canTransmitUsing(i, c))
         for (int m = 0; m < M; ++m) {
-          GRBLinExpr noise = -BM[i] * (1 - x[{i, c, m}]);
+          GRBLinExpr noise = -instance.BM[i] * (1 - x[{i, c, m}]);
 
-          for (int u = 0; u < N; ++u)
+          for (int u = 0; u < instance.N; ++u)
             for (int c_ = 0; c_ < C; ++c_)
               if (canTransmitUsing(u, c_))
-                if (u != i && overlap[c][c_]) {
+                if (u != i && instance.overlap[c][c_]) {
                   for (int m_ = 0; m_ < M; ++m_)
-                    noise += AFF[u][i] * x[{u, c_, m_}];
+                    noise += instance.AFF[u][i] * x[{u, c_, m_}];
                 }
 
-          double sinr_at_channel = AFF[i][i] / B[i][cToBIdx(c)] - NOI;
+          double sinr_at_channel = instance.AFF[i][i] / instance.B[i][cToBIdx(c)] - instance.NOI;
           model.addConstr(x[{i, c, m}] * sinr_at_channel >= noise,
                           "sinr>=noise_" + to_string(i) + "_" + to_string(c) +
                               "_" + to_string(m));
@@ -64,8 +64,7 @@ void build_subproblem(GRBModel &model, mt3 &x, vector<GRBVar> &y,
 }
 
 int main(int argc, char *argv[]) {
-  freopen(argv[1], "r", stdin);
-  read_data();
+  load_instance(argv[1]);
 
   try {
     GRBEnv env;
@@ -73,13 +72,13 @@ int main(int argc, char *argv[]) {
 
     // L_0: |L| time-slots, cada um com os links alocados no canal de 160 MHz
     vector<GRBVar> vars;
-    for (int l = 0; l < N; ++l)
+    for (int l = 0; l < instance.N; ++l)
       vars.emplace_back(
           master.addVar(0.0, 1.0, 1.0, GRB_BINARY, "sol0_" + to_string(l)));
 
-    // sum_{l \in L} \sum_{c \in C} \sum_{t \in T} x_{l}^{ct} >= 1
+    // sum_{l \in L} \sum_{c \in C} \sum_{t \in instance.T} x_{l}^{ct} >= 1
     vector<GRBConstr> masterConstrs;
-    for (int l = 0; l < N; ++l)
+    for (int l = 0; l < instance.N; ++l)
       masterConstrs.emplace_back(
           master.addConstr(vars[l] >= 1.0, "link" + to_string(l)));
 
@@ -97,7 +96,7 @@ int main(int argc, char *argv[]) {
       cout << "relaxed master solved! objective: "
            << relax.get(GRB_DoubleAttr_ObjVal) << endl;
       vector<double> pi;
-      for (int l = 0; l < N; ++l)
+      for (int l = 0; l < instance.N; ++l)
         pi.emplace_back(relax.getConstr(l).get(GRB_DoubleAttr_Pi));
 
       GRBModel sub(env);
@@ -114,11 +113,11 @@ int main(int argc, char *argv[]) {
              << endl;
 
       map<int, int> solution;
-      for (int l = 0; l < N; ++l)
+      for (int l = 0; l < instance.N; ++l)
         solution[l] = static_cast<int>(y[l].get(GRB_DoubleAttr_X) + .5);
 
       map<int, GRBColumn> col;
-      for (int l = 0; l < N; ++l)
+      for (int l = 0; l < instance.N; ++l)
         if (solution[l] > 0)
           col[l].addTerm(solution[l], masterConstrs[l]);
 

@@ -47,24 +47,15 @@ using ii = pair<int, int>;
 
 extern FILE *progress_file;
 
-extern int N, T;
-extern double alfa, NOI, powerSender;
-extern double receivers[MAX_CONN][2], senders[MAX_CONN][2];
-extern double AFF[MAX_CONN][MAX_CONN];
-extern double DM[MAX_CONN][MAX_CONN];
-extern vector<vector<double>> DR, SINR, B;
-extern vector<unordered_set<int>> C_b;
-
-extern vector<double> GMM, BM;
 extern const uint32_t seed;
-extern vector<vector<int>> overlap;
 extern Instance instance;
 
 struct Instance {
-  int N;
-  double alfa;
-  double NOI;
-  double powerSender;
+  int N = 0;
+  int T = 0;
+  double alfa = 3.0;
+  double NOI = 0.0;
+  double powerSender = 0.0;
   vector<pair<double, double>> receivers;
   vector<pair<double, double>> senders;
   vector<vector<double>> DR;
@@ -75,8 +66,10 @@ struct Instance {
   vector<vector<int>> overlap;
 
   vector<double> BM;
-  vector<pair<double, double>> AFF;
-  vector<pair<double, double>> DM;
+  vector<vector<double>> AFF;
+  vector<vector<double>> DM;
+
+  void initialize_derived_data();
 };
 
 struct Connection {
@@ -205,12 +198,10 @@ double gammaToBeta(double gmm, int bw);
 
 double convertDBMToMW(double _value);
 
-void distanceAndInterference();
-
 void convertTableToMW(const vector<vector<double>> &_SINR,
                       vector<vector<double>> &__SINR);
 
-void read_data();
+void load_instance(const string &path);
 
 void initTimeSlot();
 
