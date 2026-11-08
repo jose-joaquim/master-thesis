@@ -154,8 +154,6 @@ public:
 
 void from_json(const json &, Instance &);
 
-void to_json(json &, const Instance &);
-
 void to_json(json &, const Solution &);
 
 void init(void);

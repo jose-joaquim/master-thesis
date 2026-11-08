@@ -19,7 +19,6 @@ FILE *progress_file;
 const uint32_t seed = 77;
 
 Instance instance;
-int cnt;
 
 mt19937 gen{seed};
 uniform_int_distribution<> dist{0, MAX_CONN};
